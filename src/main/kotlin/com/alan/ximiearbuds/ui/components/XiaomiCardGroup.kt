@@ -92,11 +92,10 @@ fun XiaomiActionItem(
             )
         }
 
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+        Image(
+            painter = painterResource("drawable/right_arrow_icon.webp"),
             contentDescription = null,
-            tint = XiaomiTextMuted,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(width = 8.dp, height = 13.dp)
         )
     }
 }

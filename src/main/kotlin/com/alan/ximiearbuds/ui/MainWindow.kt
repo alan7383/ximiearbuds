@@ -296,24 +296,62 @@ fun MainWindow(
                                 )
                             }
 
-                            // 4. Function Group 1: Audio & Controls (function_layout1)
+                            // 4. Function Group 1: Audio & Controls (function_layout1 in device_settings_item_function_layout.xml)
                             XiaomiCardContainer {
-                                // Gesture operations
+                                // Audio Recording / Transcription (function_record)
+                                if (currentModel.codename.contains("N75", ignoreCase = true) || currentModel.codename.contains("O70C", ignoreCase = true)) {
+                                    XiaomiActionItem(
+                                        title = stringRes("device_settings_record_title"),
+                                        iconRes = "drawable/device_settings_audio_record.png",
+                                        onClick = {}
+                                    )
+                                    XiaomiItemDivider()
+                                }
+
+                                // Translation (function_translate)
+                                if (currentModel.codename.contains("O71", ignoreCase = true) || currentModel.codename.contains("O74", ignoreCase = true) || currentModel.codename.contains("O70C", ignoreCase = true)) {
+                                    XiaomiActionItem(
+                                        title = stringRes("device_settings_translate_title"),
+                                        iconRes = "drawable/device_settings_translate.png",
+                                        onClick = {}
+                                    )
+                                    XiaomiItemDivider()
+                                }
+
+                                // XiaoAI Voice Assistant (function_super_aivs)
+                                XiaomiActionItem(
+                                    title = stringRes("device_settings_super_aivs"),
+                                    iconRes = "drawable/device_settings_aivs.png",
+                                    onClick = {}
+                                )
+                                XiaomiItemDivider()
+
+                                // Gesture operations (function_gesture)
                                 XiaomiActionItem(
                                     title = stringRes("device_settings_gesture_operation"),
                                     iconRes = "drawable/device_settings_ic_gesture.webp",
                                     onClick = { showGestureDialog = true }
                                 )
+                                XiaomiItemDivider()
 
-                                // Sound settings (EQ, Presets)
+                                // Sound settings / EQ (function_sound)
                                 XiaomiActionItem(
                                     title = stringRes("device_settings_sound_settings"),
                                     subtitle = stringRes(equalizer.preset.stringKey),
                                     iconRes = "drawable/device_settings_ic_sound_settings.webp",
                                     onClick = { showSoundEffectDialog = true }
                                 )
+                                XiaomiItemDivider()
 
-                                // More Settings
+                                // Laboratory / Beta features (function_laboratory)
+                                XiaomiActionItem(
+                                    title = stringRes("device_settings_laboratory_function_title"),
+                                    iconRes = "drawable/device_settings_laboratory_function.png",
+                                    onClick = { showFitDetectionDialog = true }
+                                )
+                                XiaomiItemDivider()
+
+                                // More Settings (function_more_setting)
                                 XiaomiActionItem(
                                     title = stringRes("device_settings_more_settings"),
                                     iconRes = "drawable/device_settings_ic_more_settings.webp",
@@ -330,6 +368,7 @@ fun MainWindow(
                                         iconRes = "drawable/device_settings_ic_find_device.webp",
                                         onClick = { showFindDialog = true }
                                     )
+                                    XiaomiItemDivider()
                                 }
 
                                 // Firmware Update
@@ -349,6 +388,7 @@ fun MainWindow(
                                         iconRes = "drawable/device_settings_sport_settings.png",
                                         onClick = {}
                                     )
+                                    XiaomiItemDivider()
                                     XiaomiActionItem(
                                         title = stringRes("device_settings_exercise_report"),
                                         iconRes = "drawable/device_settings_ic_exercise.png",
@@ -365,6 +405,7 @@ fun MainWindow(
                                     iconRes = "drawable/device_settings_function_guide.png",
                                     onClick = { showGuideDialog = true }
                                 )
+                                XiaomiItemDivider()
 
                                 // FAQ
                                 XiaomiActionItem(
@@ -372,6 +413,7 @@ fun MainWindow(
                                     iconRes = "drawable/device_settings_ic_faq.webp",
                                     onClick = { showFaqDialog = true }
                                 )
+                                XiaomiItemDivider()
 
                                 // Anti-disconnect protection
                                 XiaomiActionItem(
@@ -379,6 +421,7 @@ fun MainWindow(
                                     iconRes = "drawable/device_settings_ic_disconnect_protect.webp",
                                     onClick = {}
                                 )
+                                XiaomiItemDivider()
 
                                 // About Device
                                 XiaomiActionItem(
