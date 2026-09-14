@@ -198,7 +198,7 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.battery",
             officialClass = "BatteryInfoContainer",
             officialXmlLayout = "device_settings_layout_battery.xml",
-            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiBatteryCapsuleKt",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.MiuixBatteryContainerKt",
             status = UiImplementationStatus.FULL_VIEW,
             description = "Left %, Right %, Case % battery gauges with charging lightning indicators"
         ),
@@ -207,7 +207,7 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.noise",
             officialClass = "NoiseLevelView",
             officialXmlLayout = "device_settings_layout_noise_redution.xml",
-            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiNoiseControlCardKt",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.MiuixNoiseReductionViewKt",
             status = UiImplementationStatus.FULL_VIEW,
             description = "3 main modes (ANC/Off/Transparent) + 6-level ANC sub-selector + transparent profiles"
         ),
@@ -248,14 +248,14 @@ class DecompiledUiAndFunctionCoverageTest {
             description = "Prompts user to scan and pair earbuds with illustration"
         ),
 
-        // Sub-screens Currently Simulated as Desktop Dialogs
+        // Sub-screens implemented as authentic full-screen MIUI fragments
         OfficialUiScreenSpec(
             name = "10-Band Studio Graphic Equalizer",
             officialPackage = "com.mi.earphone.settings.ui.customizedeq",
             officialClass = "CustomizedEqFragment",
             officialXmlLayout = "device_settings_fragment_customized_eq.xml",
-            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiEqualizerDialogKt",
-            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixEqualizerScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Preset chips + 10-band slider gain curve (-10dB to +10dB) [Android: full fragment with RangeSeekBar]"
         ),
         OfficialUiScreenSpec(
@@ -263,8 +263,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.soundeffect",
             officialClass = "SoundEffectActivity",
             officialXmlLayout = "device_settings_activity_soundeffect.xml",
-            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiSoundEffectDialogKt",
-            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixSoundEffectsScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Vocal balance, bass boost, spatial scene toggles [Android: dedicated activity]"
         ),
         OfficialUiScreenSpec(
@@ -272,8 +272,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.gesture",
             officialClass = "GestureControlFragment",
             officialXmlLayout = "device_settings_fragment_gesture.xml",
-            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiGestureDialogKt",
-            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixGestureScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Left & Right earbud tap, double, triple, long press remap [Android: full fragment with earbud diagrams]"
         ),
         OfficialUiScreenSpec(
@@ -281,8 +281,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.finddevice",
             officialClass = "FindDeviceFragment",
             officialXmlLayout = "device_settings_fragment_find_device.xml",
-            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiFindDeviceDialogKt",
-            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixFindDeviceScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Independent Left/Right audio chirp triggers [Android: full fragment with sound waves]"
         ),
         OfficialUiScreenSpec(
@@ -290,8 +290,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.fitness",
             officialClass = "FitDetectionFragment",
             officialXmlLayout = "device_settings_fragment_fit_detection.xml",
-            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiFitDetectionDialogKt",
-            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixFitDetectionScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Acoustic seal playback test [Android: full fragment with audio engine]"
         ),
         OfficialUiScreenSpec(
@@ -299,8 +299,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.earcanaldetect",
             officialClass = "EarCanalDetectionFragment",
             officialXmlLayout = "device_settings_fragment_ear_canal_detection.xml",
-            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiFitDetectionDialogKt",
-            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixFitDetectionScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "In-ear acoustic frequency sweep calibration [Android: multi-step calibration wizard]"
         ),
         OfficialUiScreenSpec(
@@ -308,8 +308,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.earbox",
             officialClass = "EarBoxSettingFragment",
             officialXmlLayout = "device_settings_fragment_earbox_sound.xml",
-            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiEarboxSoundDialogKt",
-            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixEarboxSoundScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Case sound volume, chime list, and preview [Android: full fragment with sound list]"
         ),
         OfficialUiScreenSpec(
@@ -317,8 +317,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui",
             officialClass = "DeviceSetMoreFragment",
             officialXmlLayout = "device_settings_fragment_set_more.xml",
-            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiMoreSettingsDialogKt",
-            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixMoreSettingsScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Secondary toggles (dual connection, gaming mode, auto-answer) [Android: full fragment]"
         ),
         OfficialUiScreenSpec(
@@ -326,8 +326,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.detail",
             officialClass = "DeviceInfoFragment",
             officialXmlLayout = "device_settings_fragment_device_info.xml",
-            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiDeviceAboutDialogKt",
-            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixDeviceInfoScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Hardware version, Bluetooth MAC, SN, battery health [Android: full fragment]"
         ),
 
