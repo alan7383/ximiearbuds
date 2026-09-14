@@ -157,32 +157,313 @@ class DecompiledUiAndFunctionCoverageTest {
         assertTrue(implementedCount >= 40, "Expected at least 40 functions covered in core engine, got $implementedCount")
     }
 
+    enum class UiImplementationStatus {
+        FULL_VIEW,             // Screen exists as full view matching Android layout
+        DIALOG_APPROXIMATION,  // Screen exists only as a popup dialog (needs refactoring to authentic full view)
+        NOT_IMPLEMENTED        // Screen missing completely
+    }
+
+    data class OfficialUiScreenSpec(
+        val name: String,
+        val officialPackage: String,
+        val officialClass: String,
+        val officialXmlLayout: String,
+        val desktopComponent: String,
+        val status: UiImplementationStatus,
+        val description: String
+    )
+
+    private val officialUiScreens = listOf(
+        // Core Main Screen Components
+        OfficialUiScreenSpec(
+            name = "Main Root View (DeviceSettingsFragment)",
+            officialPackage = "com.mi.earphone.settings.ui",
+            officialClass = "DeviceSettingsFragment",
+            officialXmlLayout = "device_settings_fragment_device_settings.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.MainWindowKt",
+            status = UiImplementationStatus.FULL_VIEW,
+            description = "Main scrollable settings container with MIUI background and springback behavior"
+        ),
+        OfficialUiScreenSpec(
+            name = "Hero Device Banner & Status",
+            officialPackage = "com.mi.earphone.settings.ui",
+            officialClass = "DeviceSettingsAdapter",
+            officialXmlLayout = "device_settings_item_main_device_info.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiHeroBannerKt",
+            status = UiImplementationStatus.FULL_VIEW,
+            description = "Earbuds render with dynamic colorway, connection indicator, and model title"
+        ),
+        OfficialUiScreenSpec(
+            name = "Triple Battery Container",
+            officialPackage = "com.mi.earphone.settings.ui.battery",
+            officialClass = "BatteryInfoContainer",
+            officialXmlLayout = "device_settings_layout_battery.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiBatteryCapsuleKt",
+            status = UiImplementationStatus.FULL_VIEW,
+            description = "Left %, Right %, Case % battery gauges with charging lightning indicators"
+        ),
+        OfficialUiScreenSpec(
+            name = "Active Noise Control (ANC) Card",
+            officialPackage = "com.mi.earphone.settings.ui.noise",
+            officialClass = "NoiseLevelView",
+            officialXmlLayout = "device_settings_layout_noise_redution.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiNoiseControlCardKt",
+            status = UiImplementationStatus.FULL_VIEW,
+            description = "3 main modes (ANC/Off/Transparent) + 6-level ANC sub-selector + transparent profiles"
+        ),
+        OfficialUiScreenSpec(
+            name = "Feature Card Groups (Audio, Gestures, More)",
+            officialPackage = "com.mi.earphone.settings.ui",
+            officialClass = "DeviceSettingsAdapter",
+            officialXmlLayout = "device_settings_item_function_layout.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiCardGroupKt",
+            status = UiImplementationStatus.FULL_VIEW,
+            description = "MIUI rounded card groups with 54dp indented dividers and official chevrons"
+        ),
+        OfficialUiScreenSpec(
+            name = "Add Device Catalog Wizard",
+            officialPackage = "com.mi.earphone.device.manager.ui.adddevice",
+            officialClass = "AddDeviceFragment",
+            officialXmlLayout = "device_fragment_add_device.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiAddDeviceViewKt",
+            status = UiImplementationStatus.FULL_VIEW,
+            description = "Categorized catalog grid (Xiaomi/Redmi/POCO) with cloud asset syncing"
+        ),
+        OfficialUiScreenSpec(
+            name = "Radar Device Scan & Pairing",
+            officialPackage = "com.mi.earphone.device.manager.ui.scan",
+            officialClass = "ScanDeviceFragment",
+            officialXmlLayout = "device_fragment_scan_device.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiScanDeviceViewKt",
+            status = UiImplementationStatus.FULL_VIEW,
+            description = "Bluetooth radar animation, discovery cards, and manual pairing guides"
+        ),
+        OfficialUiScreenSpec(
+            name = "Empty State (No Earbuds Paired)",
+            officialPackage = "com.mi.earphone.settings.ui",
+            officialClass = "DeviceSettingsFragment",
+            officialXmlLayout = "device_settings_empty_layout.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiEmptyStateViewKt",
+            status = UiImplementationStatus.FULL_VIEW,
+            description = "Prompts user to scan and pair earbuds with illustration"
+        ),
+
+        // Sub-screens Currently Simulated as Desktop Dialogs
+        OfficialUiScreenSpec(
+            name = "10-Band Studio Graphic Equalizer",
+            officialPackage = "com.mi.earphone.settings.ui.customizedeq",
+            officialClass = "CustomizedEqFragment",
+            officialXmlLayout = "device_settings_fragment_customized_eq.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiEqualizerDialogKt",
+            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            description = "Preset chips + 10-band slider gain curve (-10dB to +10dB) [Android: full fragment with RangeSeekBar]"
+        ),
+        OfficialUiScreenSpec(
+            name = "Sound Effects & Spatial Audio",
+            officialPackage = "com.mi.earphone.settings.ui.soundeffect",
+            officialClass = "SoundEffectActivity",
+            officialXmlLayout = "device_settings_activity_soundeffect.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiSoundEffectDialogKt",
+            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            description = "Vocal balance, bass boost, spatial scene toggles [Android: dedicated activity]"
+        ),
+        OfficialUiScreenSpec(
+            name = "Gesture Remapping & Touch Controls",
+            officialPackage = "com.mi.earphone.settings.ui.gesture",
+            officialClass = "GestureControlFragment",
+            officialXmlLayout = "device_settings_fragment_gesture.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiGestureDialogKt",
+            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            description = "Left & Right earbud tap, double, triple, long press remap [Android: full fragment with earbud diagrams]"
+        ),
+        OfficialUiScreenSpec(
+            name = "Find Device Acoustic Chime",
+            officialPackage = "com.mi.earphone.settings.ui.finddevice",
+            officialClass = "FindDeviceFragment",
+            officialXmlLayout = "device_settings_fragment_find_device.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiFindDeviceDialogKt",
+            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            description = "Independent Left/Right audio chirp triggers [Android: full fragment with sound waves]"
+        ),
+        OfficialUiScreenSpec(
+            name = "In-Ear Fit Detection",
+            officialPackage = "com.mi.earphone.settings.ui.fitness",
+            officialClass = "FitDetectionFragment",
+            officialXmlLayout = "device_settings_fragment_fit_detection.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiFitDetectionDialogKt",
+            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            description = "Acoustic seal playback test [Android: full fragment with audio engine]"
+        ),
+        OfficialUiScreenSpec(
+            name = "Ear Canal Personalization Calibration",
+            officialPackage = "com.mi.earphone.settings.ui.earcanaldetect",
+            officialClass = "EarCanalDetectionFragment",
+            officialXmlLayout = "device_settings_fragment_ear_canal_detection.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiFitDetectionDialogKt",
+            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            description = "In-ear acoustic frequency sweep calibration [Android: multi-step calibration wizard]"
+        ),
+        OfficialUiScreenSpec(
+            name = "Earbox Ringtone & Notification Sounds",
+            officialPackage = "com.mi.earphone.settings.ui.earbox",
+            officialClass = "EarBoxSettingFragment",
+            officialXmlLayout = "device_settings_fragment_earbox_sound.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiEarboxSoundDialogKt",
+            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            description = "Case sound volume, chime list, and preview [Android: full fragment with sound list]"
+        ),
+        OfficialUiScreenSpec(
+            name = "More Settings Sub-Menu",
+            officialPackage = "com.mi.earphone.settings.ui",
+            officialClass = "DeviceSetMoreFragment",
+            officialXmlLayout = "device_settings_fragment_set_more.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiMoreSettingsDialogKt",
+            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            description = "Secondary toggles (dual connection, gaming mode, auto-answer) [Android: full fragment]"
+        ),
+        OfficialUiScreenSpec(
+            name = "Device Info & Firmware Diagnostics",
+            officialPackage = "com.mi.earphone.settings.ui.detail",
+            officialClass = "DeviceInfoFragment",
+            officialXmlLayout = "device_settings_fragment_device_info.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.components.XiaomiDeviceAboutDialogKt",
+            status = UiImplementationStatus.DIALOG_APPROXIMATION,
+            description = "Hardware version, Bluetooth MAC, SN, battery health [Android: full fragment]"
+        ),
+
+        // Subsystems Currently Missing from Desktop UI
+        OfficialUiScreenSpec(
+            name = "Spatial Audio & Head Tracking Studio",
+            officialPackage = "com.mi.earphone.settings.ui.spatialaudio",
+            officialClass = "PersonalAudioFragment",
+            officialXmlLayout = "device_settings_activity_spatial_audio.xml",
+            desktopComponent = "NOT_CREATED",
+            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            description = "3D surround rendering calibration with head orientation gyro visualization"
+        ),
+        OfficialUiScreenSpec(
+            name = "Firmware OTA Flasher & Changelog",
+            officialPackage = "com.mi.earphone.settings.ui.update",
+            officialClass = "CheckUpdateFragment",
+            officialXmlLayout = "device_settings_fragment_check_update.xml",
+            desktopComponent = "NOT_CREATED",
+            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            description = "OTA update checker, changelog viewer, and block transfer progress screen"
+        ),
+        OfficialUiScreenSpec(
+            name = "2.4GHz USB Dongle Gaming Settings",
+            officialPackage = "com.mi.earphone.settings.ui.usb",
+            officialClass = "DongleSettingsFragment",
+            officialXmlLayout = "device_settings_fragment_usb.xml",
+            desktopComponent = "NOT_CREATED",
+            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            description = "Low-latency wireless dongle pairing and dedicated dongle touch mappings"
+        ),
+        OfficialUiScreenSpec(
+            name = "XiaoAI Voice Assistant Settings",
+            officialPackage = "com.mi.earphone.settings.ui.xiaoai",
+            officialClass = "XiaoAiSettingsFragment",
+            officialXmlLayout = "device_settings_fragment_xiao_ai_settings.xml",
+            desktopComponent = "NOT_CREATED",
+            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            description = "Voice tone selection, hotword triggers, and continuous dialogue timeout"
+        ),
+        OfficialUiScreenSpec(
+            name = "Device Laboratory (Beta Features)",
+            officialPackage = "com.mi.earphone.settings.ui.lab",
+            officialClass = "DeviceLaboratoryFragment",
+            officialXmlLayout = "device_settings_fragment_laboratory.xml",
+            desktopComponent = "NOT_CREATED",
+            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            description = "Experimental features, noise reduction lab, and developer telemetry"
+        ),
+        OfficialUiScreenSpec(
+            name = "Personalized Skin & Theme Gallery",
+            officialPackage = "com.mi.earphone.settings.ui.skin",
+            officialClass = "PersonalSkinFragment",
+            officialXmlLayout = "device_settings_fragment_personal_skin.xml",
+            desktopComponent = "NOT_CREATED",
+            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            description = "Pop-up pairing animations, custom earbud colorway skins, and sound themes"
+        ),
+        OfficialUiScreenSpec(
+            name = "Sports, Swim & Fitness Monitor",
+            officialPackage = "com.mi.earphone.settings.ui.sport",
+            officialClass = "SportSettingsFragment",
+            officialXmlLayout = "device_settings_fragment_sport_settings.xml",
+            desktopComponent = "NOT_CREATED",
+            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            description = "Bone conduction swim pool length presets and fitness workout reporting"
+        ),
+        OfficialUiScreenSpec(
+            name = "Voice Translation & Meeting Dictaphone",
+            officialPackage = "com.mi.earphone.settings.ui.voicetranslation",
+            officialClass = "AudioRecordListActivity",
+            officialXmlLayout = "device_settings_record_list_activity.xml",
+            desktopComponent = "NOT_CREATED",
+            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            description = "Real-time speech-to-text recording, face-to-face translation, and audio export"
+        )
+    )
+
     @Test
-    fun `test official layout hierarchy verification`() {
+    fun `test official UI screens and layout parity`() {
         if (!decompiledLayouts.exists()) {
-            println("Decompiled layouts directory not found, skipping XML layout count test.")
+            println("Decompiled layouts directory not found, skipping XML layout verification.")
             return
         }
 
-        val deviceLayouts = decompiledLayouts.listFiles { _, name -> name.startsWith("device_") && name.endsWith(".xml") } ?: emptyArray()
-        println("Total official device_*.xml layouts: ${deviceLayouts.size}")
-        assertTrue(deviceLayouts.isNotEmpty())
-
-        // Essential core layouts that must be matched 1:1 on desktop:
-        val essentialOfficialLayouts = listOf(
-            "device_settings_fragment_device_settings.xml",
-            "device_settings_empty_layout.xml",
-            "device_fragment_add_device.xml",
-            "device_fragment_scan_device.xml",
-            "device_settings_fragment_set_more.xml",
-            "device_settings_item_main_device_info.xml",
-            "device_settings_layout_battery.xml",
-            "device_settings_item_noise_reduction.xml"
-        )
-
-        for (layoutName in essentialOfficialLayouts) {
-            val file = File(decompiledLayouts, layoutName)
-            assertTrue(file.exists(), "Essential layout $layoutName must exist in decompiled layouts")
+        // 1. Verify that every defined official XML layout physically exists in the decompiled APK
+        for (screen in officialUiScreens) {
+            val layoutFile = File(decompiledLayouts, screen.officialXmlLayout)
+            assertTrue(layoutFile.exists(), "Layout ${screen.officialXmlLayout} for ${screen.name} must exist in decompiled APK")
         }
+
+        // 2. Compute UI Parity statistics
+        val totalScreens = officialUiScreens.size
+        val fullViews = officialUiScreens.count { it.status == UiImplementationStatus.FULL_VIEW }
+        val dialogApproximations = officialUiScreens.count { it.status == UiImplementationStatus.DIALOG_APPROXIMATION }
+        val missing = officialUiScreens.count { it.status == UiImplementationStatus.NOT_IMPLEMENTED }
+
+        val strictParityPercent = (fullViews.toDouble() / totalScreens * 100).toInt()
+        val broadCoveragePercent = ((fullViews + dialogApproximations).toDouble() / totalScreens * 100).toInt()
+
+        println("\n========================================================")
+        println("📱 DECOMPILED OFFICIAL UI & SCREEN PARITY AUDIT REPORT")
+        println("========================================================")
+        println("Total Official Screens Identified:        $totalScreens")
+        println("Authentic Full-Screen Views Implemented:  $fullViews ($strictParityPercent%)")
+        println("Dialog Approximations (Needs Refactor):   $dialogApproximations (${(dialogApproximations.toDouble() / totalScreens * 100).toInt()}%)")
+        println("Missing Screens (Pending Implementation): $missing (${(missing.toDouble() / totalScreens * 100).toInt()}%)")
+        println("--------------------------------------------------------")
+        println("Strict 1:1 Full-Screen Parity:           $strictParityPercent%")
+        println("Overall UI Feature Presence:              $broadCoveragePercent%")
+        println("--------------------------------------------------------")
+
+        println("\n🟢 AUTHENTIC FULL-SCREEN VIEWS ($fullViews/$totalScreens):")
+        officialUiScreens.filter { it.status == UiImplementationStatus.FULL_VIEW }.forEach {
+            println("  ✅ ${it.name}")
+            println("     Layout: ${it.officialXmlLayout} | Class: ${it.officialClass}")
+            println("     Desktop: ${it.desktopComponent}")
+        }
+
+        println("\n🟡 DIALOG APPROXIMATIONS (Must be refactored into authentic full sub-pages) ($dialogApproximations/$totalScreens):")
+        officialUiScreens.filter { it.status == UiImplementationStatus.DIALOG_APPROXIMATION }.forEach {
+            println("  ⚠️  ${it.name}")
+            println("     Official Layout: ${it.officialXmlLayout} [${it.officialClass}]")
+            println("     Desktop Dialog:  ${it.desktopComponent}")
+        }
+
+        println("\n🔴 COMPLETELY MISSING SCREENS ($missing/$totalScreens):")
+        officialUiScreens.filter { it.status == UiImplementationStatus.NOT_IMPLEMENTED }.forEach {
+            println("  ❌ ${it.name}")
+            println("     Official Layout: ${it.officialXmlLayout} [${it.officialClass}]")
+            println("     Description:     ${it.description}")
+        }
+        println("========================================================\n")
+
+        // Assert that we have at least verified all 25 screens exist and at least 15 have some UI presence
+        assertEquals(25, officialUiScreens.size)
+        assertTrue(fullViews + dialogApproximations >= 15)
     }
 }

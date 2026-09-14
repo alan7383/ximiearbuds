@@ -189,6 +189,63 @@ flowchart TD
 
 ---
 
+### $ deep dive: ui reverse-engineering (android xml layouts vs compose desktop)
+
+The official **Xiaomi Earbuds** Android app contains **555 XML layouts** and dozens of proprietary MIUI views (`miuix.springback.view.SpringBackLayout`, `NestedScrollView`, `NoiseReductionView`, `BatteryInfoContainer`, `LevelDotView`, `RightArrowTwoLineTextView`). 
+
+Creating an authentic PC clone requires mapping this exact hierarchy into **Compose Multiplatform** while addressing the fundamental difference between mobile touchscreens and desktop screens:
+
+```mermaid
+flowchart TD
+    subgraph Official Android App Architecture [555 XML Layouts & MIUI Views]
+        M0["MainActivity<br/>(R.layout.activity_main)"]
+        M1["DeviceSettingsFragment<br/>(device_settings_fragment_device_settings.xml)"]
+        M2["device_settings_item_main_device_info.xml<br/>(LottieAnimationView + Hardware Color Render)"]
+        M3["device_settings_layout_battery.xml<br/>(3 Triple Columns + BatteryView + Charging Indicator)"]
+        M4["device_settings_layout_noise_redution.xml<br/>(3 Radio Buttons + Stepped Dot Seekbar + Toggles)"]
+        M5["device_settings_item_function_layout.xml<br/>(Card Groups 1..4: Gestures, Sound, Lab, More, Find)"]
+        M6["DeviceSetMoreFragment<br/>(device_settings_fragment_set_more.xml)"]
+    end
+
+    subgraph XimiEarbuds Desktop Implementation [Compose Multiplatform]
+        C0["Main.kt<br/>(Desktop Window + Centered 520dp Viewport)"]
+        C1["MainWindow.kt<br/>(Screen Router & StateFlow Binding)"]
+        C2["XiaomiHeroBanner.kt<br/>(Dynamic Colorway Render & Status Badge)"]
+        C3["XiaomiBatteryCapsule.kt<br/>(Triple Left/Right/Case % + Charging Bolt)"]
+        C4["XiaomiNoiseControlCard.kt<br/>(6-Level ANC Pills + Transparency Modes)"]
+        C5["XiaomiCardContainer.kt<br/>(Official WebP Icons + MIUI Right Chevrons)"]
+        C6["XiaomiMoreSettingsView.kt<br/>(Full Sub-Settings Panel & Dialog Router)"]
+    end
+
+    M0 ==>|1:1 Architecture Port| C0
+    M1 ==>|Navigation & Vertical Flow| C1
+    M2 ==>|Hardware Asset Sync| C2
+    M3 ==>|Triple Gauge Layout| C3
+    M4 ==>|State Machine & Sliders| C4
+    M5 ==>|Official MIUI Assets| C5
+    M6 ==>|Feature Settings Port| C6
+```
+
+#### 🔍 The Current UI State vs The Real Android App (The UI Gap)
+
+While the desktop UI currently captures the **overall layout and spirit** of the mobile app, it is **not yet an exact 1:1 pixel-perfect clone**. Here is what is done versus what remains to be built:
+
+1. **Mobile Viewport Preservation (Done ✅)**:
+   - Rather than blowing up the controls into an unergonomic desktop dashboard, XimiEarbuds centers a **520dp mobile-proportioned frame** with authentic MIUI page backgrounds (`#0C0C0E` dark / `#E8E9EC` light), matching `SpringBackLayout`.
+2. **Official Drawable Assets (Done ✅)**:
+   - Uses real assets directly extracted from the official APK: `right_arrow_icon.webp`, `device_settings_ic_gesture.webp`, `device_settings_ic_sound_settings.webp`, `device_settings_ic_find_device.webp`, `device_settings_battery_frame.webp`, and `device_settings_battery_dot.webp`.
+3. **Card Group Hierarchy (Done ✅)**:
+   - Groups items exactly as defined in `device_settings_item_function_layout.xml` (Group 1: Audio/Gestures/More, Group 2: Find/Firmware, Group 3: Sports, Group 4: Help/About) with 54dp indented dividers (`XiaomiItemDivider`).
+4. **Lottie Vector Animations vs Compose Canvas (Pending ⏳)**:
+   - *Android App*: Uses interactive **Lottie JSON animations** for the pairing radar pulse, dynamic sound wave ripples in the ANC selector, and battery plug-in effects.
+   - *Desktop Client*: Currently uses native Compose Canvas rendering. Porting the real Lottie files to Compose Desktop is scheduled for Phase 1.
+5. **Multi-Step Guided Pairing Wizards (Pending ⏳)**:
+   - *Android App*: Multi-angle animated visual guides showing the exact case button or stem sensor operation for each individual model (`device_manager_scan_desc_*`).
+   - *Desktop Client*: Currently displays standard text pairing instructions.
+6. **Popups vs Full Fragment Pages (Pending ⏳)**:
+   - *Android App*: Equalizer, Gestures, and Fit Detection open as dedicated full-screen fragments with interactive 3D earbud diagrams.
+   - *Desktop Client*: Currently renders these views inside desktop dialog overlays. They will be refactored into authentic full sub-screens.
+
 ### $ deep dive: automated bytecode & ast parity tests
 
 To ensure XimiEarbuds never diverges from official specifications, automated unit tests directly inspect the decompiled source files (`/home/alan/earbuds_decompiled/sources`):
