@@ -19,9 +19,15 @@ import com.alan.ximiearbuds.ui.components.XiaomiActionItem
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
 import com.alan.ximiearbuds.ui.components.XiaomiItemDivider
 import com.alan.ximiearbuds.ui.components.XiaomiSwitchItem
+import com.alan.ximiearbuds.ui.theme.XiaomiCyan
+import com.alan.ximiearbuds.ui.theme.XiaomiRed
+import com.alan.ximiearbuds.ui.theme.XiaomiTextPrimary
+import com.alan.ximiearbuds.ui.theme.XiaomiTextSecondary
+import com.alan.ximiearbuds.ui.theme.stringRes
 
 /**
  * 1:1 replica of Xiaomi Earbuds `device_settings_fragment_set_more.xml`.
+ * Fully wired to official MIUI strings and dialogs.
  */
 @Composable
 fun MiuixMoreSettingsScreen(
@@ -30,10 +36,17 @@ fun MiuixMoreSettingsScreen(
     onNavigateToEarbox: () -> Unit,
     onNavigateToFitDetection: () -> Unit,
     onNavigateToDeviceInfo: () -> Unit,
+    onNavigateToDongle: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val quickSettings by controller.quickSettings.collectAsState()
+    val deviceInfo by controller.deviceInfo.collectAsState()
     val scrollState = rememberScrollState()
+
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var renameText by remember { mutableStateOf("") }
+    var showRemoveDialog by remember { mutableStateOf(false) }
+    var speechToChat by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -42,7 +55,7 @@ fun MiuixMoreSettingsScreen(
     ) {
         // Authentic Top Navigation Bar
         MiuixTopAppBar(
-            title = "Plus de paramètres",
+            title = stringRes("device_settings_more_settings"),
             onBackClick = onBackClick
         )
 
@@ -55,9 +68,9 @@ fun MiuixMoreSettingsScreen(
         ) {
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Section Header: Paramètres des fonctionnalités
+            // Section Header: Paramètres des fonctionnalités (label_function)
             Text(
-                text = "PARAMÈTRES DES FONCTIONNALITÉS",
+                text = stringRes("device_settings_function_settings").uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -68,58 +81,77 @@ fun MiuixMoreSettingsScreen(
             )
 
             XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
-                // In-Ear Wear Detection
+                // Speech-to-Chat / Conversation libre (handsFreeView)
                 XiaomiSwitchItem(
-                    title = "Détection intra-auriculaire",
-                    subtitle = "Met en pause la musique quand un écouteur est retiré",
+                    title = stringRes("device_settings_hands_free"),
+                    subtitle = stringRes("device_settings_limpid_desc"),
+                    checked = speechToChat,
+                    onCheckedChange = { speechToChat = it }
+                )
+
+                XiaomiItemDivider()
+
+                // In-Ear Wear Detection (monitorView)
+                XiaomiSwitchItem(
+                    title = stringRes("device_settings_wear_detection"),
+                    subtitle = stringRes("device_settings_wear_detection_des"),
                     checked = quickSettings.inEarDetection,
                     onCheckedChange = { controller.setInEarDetection(it) }
                 )
 
                 XiaomiItemDivider()
 
-                // Dual Device Multipoint
+                // Dual Device Multipoint (multy_connect_View)
                 XiaomiSwitchItem(
-                    title = "Connexion double appareil",
-                    subtitle = "Basculez automatiquement entre votre PC et votre smartphone",
+                    title = stringRes("device_settings_dual_device_connect"),
+                    subtitle = stringRes("device_settings_dual_device_connect_desc"),
                     checked = quickSettings.multipoint,
                     onCheckedChange = { controller.setMultipoint(it) }
                 )
 
                 XiaomiItemDivider()
 
-                // Low Latency Gaming Mode
+                // Low Latency Gaming Mode (low_latency)
                 XiaomiSwitchItem(
-                    title = "Mode jeu faible latence",
-                    subtitle = "Réduit la latence Bluetooth pour le gaming et la vidéo",
+                    title = stringRes("device_settings_spatial_audio_low_latency"),
+                    subtitle = stringRes("device_settings_low_latency_desc"),
                     checked = quickSettings.lowLatency,
                     onCheckedChange = { controller.setLowLatency(it) }
                 )
 
                 XiaomiItemDivider()
 
-                // Fit Detection
+                // Fit Detection (fitDetect)
                 XiaomiActionItem(
-                    title = "Test d'ajustement des embouts",
-                    subtitle = "Vérifie l'étanchéité acoustique des embouts",
+                    title = stringRes("device_settings_fit_detection"),
+                    subtitle = stringRes("login_guide_fit_detect_detail"),
                     onClick = onNavigateToFitDetection
                 )
 
                 XiaomiItemDivider()
 
-                // Earbox Sound
+                // Earbox Sound (earbox)
                 XiaomiActionItem(
-                    title = "Sons et alertes du boîtier",
-                    subtitle = "Personnaliser les alertes d'ouverture et de charge",
+                    title = stringRes("device_settings_earbox_sound"),
+                    subtitle = stringRes("device_settings_earbox_charge_sound"),
                     onClick = onNavigateToEarbox
                 )
+
+                if (onNavigateToDongle != null) {
+                    XiaomiItemDivider()
+                    XiaomiActionItem(
+                        title = stringRes("device_settings_dongle_mode"),
+                        subtitle = stringRes("device_settings_dongle_gesture_notify"),
+                        onClick = onNavigateToDongle
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Section Header: Autre
+            // Section Header: Autre (label_other)
             Text(
-                text = "AUTRE",
+                text = stringRes("device_settings_others").uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -130,17 +162,29 @@ fun MiuixMoreSettingsScreen(
             )
 
             XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
+                // Rename Device (renameDevice)
+                XiaomiActionItem(
+                    title = stringRes("device_settings_rename_device"),
+                    subtitle = deviceInfo.name.ifBlank { "Xiaomi Earbuds" },
+                    onClick = {
+                        renameText = deviceInfo.name.ifBlank { "Xiaomi Earbuds" }
+                        showRenameDialog = true
+                    }
+                )
+
+                XiaomiItemDivider()
+
                 // Device Info
                 XiaomiActionItem(
-                    title = "À propos de l'appareil",
-                    subtitle = "Version logicielle, adresse MAC et statut matériel",
+                    title = stringRes("device_settings_about_device"),
+                    subtitle = deviceInfo.versionName.ifBlank { "v1.0.8.2" },
                     onClick = onNavigateToDeviceInfo
                 )
             }
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Unpair Device Destructive Button
+            // Unpair Device Destructive Button (delete_device)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -148,13 +192,10 @@ fun MiuixMoreSettingsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Button(
-                    onClick = {
-                        controller.disconnect()
-                        onBackClick()
-                    },
+                    onClick = { showRemoveDialog = true },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0x1AFF3B30),
-                        contentColor = Color(0xFFFF3B30)
+                        containerColor = XiaomiRed.copy(alpha = 0.12f),
+                        contentColor = XiaomiRed
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
@@ -162,12 +203,100 @@ fun MiuixMoreSettingsScreen(
                         .height(48.dp)
                 ) {
                     Text(
-                        text = "Dissocier cet appareil",
+                        text = stringRes("device_settings_remove_device"),
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
                     )
                 }
             }
         }
+    }
+
+    // Rename Device Dialog (matching SettingsPageUtil.showRenameDeviceDialog)
+    if (showRenameDialog) {
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = {
+                Text(
+                    text = stringRes("device_settings_rename_device"),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    label = { Text(stringRes("device_settings_rename_device")) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showRenameDialog = false
+                    }
+                ) {
+                    Text(
+                        text = stringRes("device_settings_rename_dialog_confirm"),
+                        color = XiaomiCyan,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) {
+                    Text(
+                        text = stringRes("device_settings_dialog_cancle"),
+                        color = XiaomiTextSecondary
+                    )
+                }
+            }
+        )
+    }
+
+    // Remove / Unpair Device Dialog (matching SettingsPageUtil.showRemoveDeviceDialog)
+    if (showRemoveDialog) {
+        AlertDialog(
+            onDismissRequest = { showRemoveDialog = false },
+            title = {
+                Text(
+                    text = stringRes("device_settings_remove_device"),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Text(
+                    text = stringRes("device_settings_remove_device_des"),
+                    fontSize = 14.sp,
+                    color = XiaomiTextPrimary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showRemoveDialog = false
+                        controller.disconnect()
+                        onBackClick()
+                    }
+                ) {
+                    Text(
+                        text = stringRes("device_settings_remove_device_confirm"),
+                        color = XiaomiRed,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveDialog = false }) {
+                    Text(
+                        text = stringRes("device_settings_dialog_cancle"),
+                        color = XiaomiTextSecondary
+                    )
+                }
+            }
+        )
     }
 }

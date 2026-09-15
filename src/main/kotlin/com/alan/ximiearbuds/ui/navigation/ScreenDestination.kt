@@ -15,4 +15,13 @@ sealed class ScreenDestination(val title: String) {
     object DeviceInfo : ScreenDestination("À propos de l'appareil")
     object AddDevice : ScreenDestination("Ajouter un appareil")
     object ScanDevice : ScreenDestination("Recherche des écouteurs")
+    object SpatialAudio : ScreenDestination("Audio spatial")
+    object FirmwareUpdate : ScreenDestination("Mise à jour du firmware")
+    object DongleSettings : ScreenDestination("Paramètres du dongle")
+    object XiaoAiSettings : ScreenDestination("Assistant vocal XiaoAI")
+    object Laboratory : ScreenDestination("Laboratoire")
+    object PersonalSkin : ScreenDestination("Personnalisation des skins")
+    object SportSettings : ScreenDestination("Paramètres de sport")
+    object VoiceTranslation : ScreenDestination("Enregistrement et traduction")
+    object BeginnerGuide : ScreenDestination("Guide de bienvenue")
 }

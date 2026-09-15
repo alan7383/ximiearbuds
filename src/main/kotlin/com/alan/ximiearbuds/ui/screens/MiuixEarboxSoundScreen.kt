@@ -5,13 +5,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -20,9 +17,12 @@ import com.alan.ximiearbuds.ui.components.MiuixTopAppBar
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
 import com.alan.ximiearbuds.ui.components.XiaomiSwitchItem
 import com.alan.ximiearbuds.ui.components.XiaomiItemDivider
+import com.alan.ximiearbuds.ui.theme.XiaomiCyan
+import com.alan.ximiearbuds.ui.theme.stringRes
 
 /**
  * 1:1 replica of Xiaomi Earbuds `device_settings_fragment_earbox_sound.xml`.
+ * Fully wired to official MIUI strings.
  */
 @Composable
 fun MiuixEarboxSoundScreen(
@@ -42,7 +42,7 @@ fun MiuixEarboxSoundScreen(
     ) {
         // Top Navigation Bar
         MiuixTopAppBar(
-            title = "Sons du boîtier",
+            title = stringRes("device_settings_earbox_sound"),
             onBackClick = onBackClick
         )
 
@@ -57,7 +57,7 @@ fun MiuixEarboxSoundScreen(
 
             // Volume Section Header
             Text(
-                text = "VOLUME DES SONNERIES",
+                text = stringRes("notification_volume").ifBlank { "Volume" }.uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -76,14 +76,14 @@ fun MiuixEarboxSoundScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Niveau sonore du haut-parleur",
+                            text = stringRes("device_settings_earbox_sound"),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "${volume.toInt()}%",
                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = Color(0xFF007AFF)
+                            color = XiaomiCyan
                         )
                     }
 
@@ -94,8 +94,8 @@ fun MiuixEarboxSoundScreen(
                         onValueChange = { volume = it },
                         valueRange = 0f..100f,
                         colors = SliderDefaults.colors(
-                            thumbColor = Color(0xFF007AFF),
-                            activeTrackColor = Color(0xFF007AFF)
+                            thumbColor = XiaomiCyan,
+                            activeTrackColor = XiaomiCyan
                         )
                     )
                 }
@@ -105,7 +105,7 @@ fun MiuixEarboxSoundScreen(
 
             // Events Section Header
             Text(
-                text = "ÉVÉNEMENTS SONORES",
+                text = stringRes("device_settings_function_settings").uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -117,8 +117,8 @@ fun MiuixEarboxSoundScreen(
 
             XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
                 XiaomiSwitchItem(
-                    title = "Ouverture du boîtier",
-                    subtitle = "Joue un carillon sonore quand le couvercle est ouvert",
+                    title = stringRes("device_settings_earbox_opening_sound"),
+                    subtitle = stringRes("device_settings_earbox_opening_sound"),
                     checked = openSound,
                     onCheckedChange = { openSound = it }
                 )
@@ -126,8 +126,8 @@ fun MiuixEarboxSoundScreen(
                 XiaomiItemDivider()
 
                 XiaomiSwitchItem(
-                    title = "Fermeture du boîtier",
-                    subtitle = "Joue une notification discrète à la fermeture",
+                    title = stringRes("device_settings_earbox_closing_sound"),
+                    subtitle = stringRes("device_settings_earbox_closing_sound"),
                     checked = closeSound,
                     onCheckedChange = { closeSound = it }
                 )
@@ -135,8 +135,8 @@ fun MiuixEarboxSoundScreen(
                 XiaomiItemDivider()
 
                 XiaomiSwitchItem(
-                    title = "Mise en charge",
-                    subtitle = "Indique acoustiquement le bon positionnement sur le chargeur",
+                    title = stringRes("device_settings_earbox_charge_sound"),
+                    subtitle = stringRes("device_settings_earbox_charge_sound"),
                     checked = chargeSound,
                     onCheckedChange = { chargeSound = it }
                 )

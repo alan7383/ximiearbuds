@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alan.ximiearbuds.core.bluetooth.ConnectionState
+import com.alan.ximiearbuds.core.device.DevicePreferences
 import com.alan.ximiearbuds.core.device.DeviceRegistry
 import com.alan.ximiearbuds.core.device.EarbudsController
 import com.alan.ximiearbuds.core.device.EarbudsModel
@@ -31,12 +32,14 @@ import com.alan.ximiearbuds.ui.theme.*
 
 /**
  * Screen navigation states matching official decompiled mobile application:
+ * - WELCOME: login_activity_guide.xml (GuideActivity onboarding carousel)
  * - EMPTY: device_settings_empty_layout.xml (no device connected/paired)
  * - ADD_DEVICE: device_fragment_add_device.xml (radar scan + 2-column small device cards)
  * - SCAN_GUIDE: device_fragment_scan_device.xml (pairing guidance for selected model)
  * - DEVICE_SETTINGS: device_settings_fragment_device_settings.xml (control panel)
  */
 enum class AppScreen {
+    WELCOME,
     EMPTY,
     ADD_DEVICE,
     SCAN_GUIDE,
@@ -63,15 +66,25 @@ fun MainWindow(
     val noiseControl by controller.noiseControl.collectAsState()
     val equalizer by controller.equalizer.collectAsState()
 
-    var currentScreen by remember { mutableStateOf(AppScreen.EMPTY) }
+    val isConnected = connectionState == ConnectionState.CONNECTED
+    val isWelcomeFinished = remember { DevicePreferences.isWelcomeFinished() }
+    var currentScreen by remember {
+        mutableStateOf(
+            if (!isWelcomeFinished && activeModel == null && !isConnected) {
+                AppScreen.WELCOME
+            } else if (activeModel != null || isConnected) {
+                AppScreen.DEVICE_SETTINGS
+            } else {
+                AppScreen.EMPTY
+            }
+        )
+    }
     var selectedModelForGuide by remember { mutableStateOf<EarbudsModel?>(null) }
     var showLangMenu by remember { mutableStateOf(false) }
 
     // Screen backstack within the connected device settings viewport
     val navStack = remember { mutableStateListOf<ScreenDestination>(ScreenDestination.MainSettings) }
     val currentDestination = navStack.lastOrNull() ?: ScreenDestination.MainSettings
-
-    val isConnected = connectionState == ConnectionState.CONNECTED
 
     // Automatically transition to DEVICE_SETTINGS when an earbud is connected or active
     LaunchedEffect(isConnected, activeModel) {
@@ -106,9 +119,17 @@ fun MainWindow(
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // -------------------------------------------------------------------------
-                // 1. Root Screen Router (Empty -> Add Device -> Scan Guide -> Device Settings)
+                // 1. Root Screen Router (Welcome -> Empty -> Add Device -> Scan Guide -> Settings)
                 // -------------------------------------------------------------------------
                 when (currentScreen) {
+                    AppScreen.WELCOME -> {
+                        MiuixWelcomeGuideScreen(
+                            onFinish = {
+                                currentScreen = if (activeModel != null || isConnected) AppScreen.DEVICE_SETTINGS else AppScreen.EMPTY
+                            }
+                        )
+                    }
+
                     AppScreen.EMPTY -> {
                         // Top Bar for Empty State
                         Row(
@@ -127,8 +148,20 @@ fun MainWindow(
                                 fontWeight = FontWeight.SemiBold
                             )
 
-                            // Quick settings in corner: Language & Theme
+                            // Quick settings in corner: Guide, Language & Theme
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { currentScreen = AppScreen.WELCOME },
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.HelpOutline,
+                                        contentDescription = "Welcome Guide",
+                                        tint = XiaomiTextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
                                 IconButton(
                                     onClick = { showLangMenu = true },
                                     modifier = Modifier.size(34.dp)
@@ -267,7 +300,8 @@ fun MainWindow(
                                         deviceName = activeDeviceName,
                                         isConnected = isConnected,
                                         colorType = deviceInfo.colorType,
-                                        onColorSelected = { colorId -> controller.setDeviceColor(colorId) }
+                                        onColorSelected = { colorId -> controller.setDeviceColor(colorId) },
+                                        onSkinClick = { navStack.add(ScreenDestination.PersonalSkin) }
                                     )
 
                                     // 2. Authentic Battery Container 1:1 (device_settings_layout_battery.xml)
@@ -294,7 +328,7 @@ fun MainWindow(
                                             XiaomiActionItem(
                                                 title = stringRes("device_settings_record_title"),
                                                 iconRes = "drawable/device_settings_audio_record.png",
-                                                onClick = {}
+                                                onClick = { navStack.add(ScreenDestination.VoiceTranslation) }
                                             )
                                             XiaomiItemDivider()
                                         }
@@ -304,7 +338,7 @@ fun MainWindow(
                                             XiaomiActionItem(
                                                 title = stringRes("device_settings_translate_title"),
                                                 iconRes = "drawable/device_settings_translate.png",
-                                                onClick = {}
+                                                onClick = { navStack.add(ScreenDestination.VoiceTranslation) }
                                             )
                                             XiaomiItemDivider()
                                         }
@@ -313,7 +347,7 @@ fun MainWindow(
                                         XiaomiActionItem(
                                             title = stringRes("device_settings_super_aivs"),
                                             iconRes = "drawable/device_settings_aivs.png",
-                                            onClick = {}
+                                            onClick = { navStack.add(ScreenDestination.XiaoAiSettings) }
                                         )
                                         XiaomiItemDivider()
 
@@ -334,11 +368,11 @@ fun MainWindow(
                                         )
                                         XiaomiItemDivider()
 
-                                        // Laboratory / Fit detection -> Opens full MiuixFitDetectionScreen
+                                        // Laboratory / Fit detection -> Opens full MiuixLaboratoryScreen
                                         XiaomiActionItem(
                                             title = stringRes("device_settings_laboratory_function_title"),
                                             iconRes = "drawable/device_settings_laboratory_function.png",
-                                            onClick = { navStack.add(ScreenDestination.FitDetection) }
+                                            onClick = { navStack.add(ScreenDestination.Laboratory) }
                                         )
                                         XiaomiItemDivider()
 
@@ -362,12 +396,12 @@ fun MainWindow(
                                             XiaomiItemDivider()
                                         }
 
-                                        // Firmware Update
+                                        // Firmware Update -> Opens full MiuixFirmwareUpdateScreen
                                         XiaomiActionItem(
                                             title = stringRes("device_settings_firmware_update"),
                                             badgeText = deviceInfo.versionName.ifBlank { "1.0.8.2" },
                                             iconRes = "drawable/device_settings_ic_firmware_update.webp",
-                                            onClick = { navStack.add(ScreenDestination.DeviceInfo) }
+                                            onClick = { navStack.add(ScreenDestination.FirmwareUpdate) }
                                         )
                                     }
 
@@ -377,13 +411,13 @@ fun MainWindow(
                                             XiaomiActionItem(
                                                 title = stringRes("device_settings_sport_config"),
                                                 iconRes = "drawable/device_settings_sport_settings.png",
-                                                onClick = {}
+                                                onClick = { navStack.add(ScreenDestination.SportSettings) }
                                             )
                                             XiaomiItemDivider()
                                             XiaomiActionItem(
                                                 title = stringRes("device_settings_exercise_report"),
                                                 iconRes = "drawable/device_settings_ic_exercise.png",
-                                                onClick = {}
+                                                onClick = { navStack.add(ScreenDestination.SportSettings) }
                                             )
                                         }
                                     }
@@ -408,7 +442,8 @@ fun MainWindow(
                                     onBackClick = { navStack.removeLast() },
                                     onNavigateToEarbox = { navStack.add(ScreenDestination.EarboxSound) },
                                     onNavigateToFitDetection = { navStack.add(ScreenDestination.FitDetection) },
-                                    onNavigateToDeviceInfo = { navStack.add(ScreenDestination.DeviceInfo) }
+                                    onNavigateToDeviceInfo = { navStack.add(ScreenDestination.DeviceInfo) },
+                                    onNavigateToDongle = { navStack.add(ScreenDestination.DongleSettings) }
                                 )
                             }
 
@@ -423,7 +458,8 @@ fun MainWindow(
                                 MiuixSoundEffectsScreen(
                                     controller = controller,
                                     onBackClick = { navStack.removeLast() },
-                                    onNavigateToEqualizer = { navStack.add(ScreenDestination.CustomizedEq) }
+                                    onNavigateToEqualizer = { navStack.add(ScreenDestination.CustomizedEq) },
+                                    onNavigateToSpatialAudio = { navStack.add(ScreenDestination.SpatialAudio) }
                                 )
                             }
 
@@ -457,7 +493,73 @@ fun MainWindow(
                                 MiuixDeviceInfoScreen(
                                     deviceInfo = deviceInfo,
                                     activeModel = activeModel ?: currentModel,
+                                    onBackClick = { navStack.removeLast() },
+                                    onNavigateToGuide = { navStack.add(ScreenDestination.BeginnerGuide) }
+                                )
+                            }
+
+                            ScreenDestination.SpatialAudio -> {
+                                MiuixSpatialAudioScreen(
+                                    controller = controller,
                                     onBackClick = { navStack.removeLast() }
+                                )
+                            }
+
+                            ScreenDestination.FirmwareUpdate -> {
+                                MiuixFirmwareUpdateScreen(
+                                    controller = controller,
+                                    activeModel = activeModel ?: currentModel,
+                                    onBackClick = { navStack.removeLast() }
+                                )
+                            }
+
+                            ScreenDestination.DongleSettings -> {
+                                MiuixDongleSettingsScreen(
+                                    controller = controller,
+                                    onBackClick = { navStack.removeLast() }
+                                )
+                            }
+
+                            ScreenDestination.XiaoAiSettings -> {
+                                MiuixXiaoAiScreen(
+                                    controller = controller,
+                                    onBackClick = { navStack.removeLast() }
+                                )
+                            }
+
+                            ScreenDestination.Laboratory -> {
+                                MiuixLaboratoryScreen(
+                                    controller = controller,
+                                    onBackClick = { navStack.removeLast() },
+                                    onNavigateToFitDetection = { navStack.add(ScreenDestination.FitDetection) }
+                                )
+                            }
+
+                            ScreenDestination.PersonalSkin -> {
+                                MiuixPersonalSkinScreen(
+                                    controller = controller,
+                                    activeModel = activeModel ?: currentModel,
+                                    onBackClick = { navStack.removeLast() }
+                                )
+                            }
+
+                            ScreenDestination.SportSettings -> {
+                                MiuixSportSettingsScreen(
+                                    controller = controller,
+                                    onBackClick = { navStack.removeLast() }
+                                )
+                            }
+
+                            ScreenDestination.VoiceTranslation -> {
+                                MiuixVoiceTranslationScreen(
+                                    controller = controller,
+                                    onBackClick = { navStack.removeLast() }
+                                )
+                            }
+
+                            ScreenDestination.BeginnerGuide -> {
+                                MiuixWelcomeGuideScreen(
+                                    onFinish = { navStack.removeLast() }
                                 )
                             }
 

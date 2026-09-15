@@ -32,6 +32,7 @@ object DevicePreferences {
     // Key: Normalized MAC address or device name -> Value: colorType ID
     private val colorMap = ConcurrentHashMap<String, Int>()
     private var lastUsedDevice: String? = null
+    private var isWelcomeFinished: Boolean = false
 
     init {
         loadSettings()
@@ -47,6 +48,7 @@ object DevicePreferences {
                 val content = settingsFile.readText()
                 val root = jsonParser.parseToJsonElement(content).jsonObject
                 lastUsedDevice = root["lastUsedDevice"]?.jsonPrimitive?.contentOrNull
+                isWelcomeFinished = root["welcomeFinished"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: false
                 val colors = root["colors"]?.jsonObject
                 colors?.forEach { (mac, elem) ->
                     val c = elem.jsonPrimitive.intOrNull
@@ -65,6 +67,7 @@ object DevicePreferences {
             try {
                 val json = buildJsonObject {
                     lastUsedDevice?.let { put("lastUsedDevice", it) }
+                    put("welcomeFinished", isWelcomeFinished)
                     put("colors", buildJsonObject {
                         colorMap.forEach { (mac, color) ->
                             put(mac, color)
@@ -75,6 +78,23 @@ object DevicePreferences {
             } catch (e: Exception) {
                 // Ignore IO errors
             }
+        }
+    }
+
+    /**
+     * Checks whether the user has completed or skipped the welcome onboarding guide.
+     * Matches official ModePreference.isWelcomeFinish() in com.mi.earphone.
+     */
+    fun isWelcomeFinished(): Boolean = isWelcomeFinished
+
+    /**
+     * Updates the welcome onboarding guide status.
+     * Matches official ModePreference.setWelcomeFinish(true).
+     */
+    fun setWelcomeFinished(finished: Boolean) {
+        if (isWelcomeFinished != finished) {
+            isWelcomeFinished = finished
+            saveSettingsAsync()
         }
     }
 

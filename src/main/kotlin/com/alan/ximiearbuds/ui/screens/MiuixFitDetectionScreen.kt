@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alan.ximiearbuds.ui.components.MiuixTopAppBar
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
+import com.alan.ximiearbuds.ui.theme.stringRes
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -50,7 +51,7 @@ fun MiuixFitDetectionScreen(
     ) {
         // Top Navigation Bar
         MiuixTopAppBar(
-            title = "Test d'ajustement",
+            title = stringRes("device_settings_fit_detection"),
             onBackClick = onBackClick
         )
 
@@ -81,7 +82,7 @@ fun MiuixFitDetectionScreen(
             Spacer(modifier = Modifier.height(18.dp))
 
             Text(
-                text = "Ajustement des embouts",
+                text = stringRes("device_settings_fit_detection"),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -89,7 +90,7 @@ fun MiuixFitDetectionScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Un bon ajustement améliore l'isolation passive, la performance de la réduction active du bruit et la réponse en basses fréquences.",
+                text = stringRes("device_settings_fit_detection_des"),
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center,
@@ -107,7 +108,7 @@ fun MiuixFitDetectionScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Placez les deux écouteurs confortablement dans vos oreilles puis lancez le test sonore.",
+                                text = stringRes("device_settings_put_both_earbuds_into_ears_before_detecting"),
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                 textAlign = TextAlign.Center
@@ -127,9 +128,15 @@ fun MiuixFitDetectionScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Analyse acoustique en cours...",
+                            text = stringRes("device_settings_fit_detecting"),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                             color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = stringRes("device_settings_fit_detecting_des"),
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     }
                 }
@@ -141,7 +148,7 @@ fun MiuixFitDetectionScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Écouteur Gauche", style = MaterialTheme.typography.bodyMedium)
+                                Text(stringRes("device_settings_find_side_left"), style = MaterialTheme.typography.bodyMedium)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = Icons.Default.CheckCircle,
@@ -150,7 +157,7 @@ fun MiuixFitDetectionScreen(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Ajustement optimal", color = Color(0xFF00C853), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(stringRes("device_settings_fit_detection_well"), color = Color(0xFF00C853), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
 
@@ -161,7 +168,7 @@ fun MiuixFitDetectionScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Écouteur Droit", style = MaterialTheme.typography.bodyMedium)
+                                Text(stringRes("device_settings_find_side_right"), style = MaterialTheme.typography.bodyMedium)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = Icons.Default.CheckCircle,
@@ -170,7 +177,7 @@ fun MiuixFitDetectionScreen(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Ajustement optimal", color = Color(0xFF00C853), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(stringRes("device_settings_fit_detection_well"), color = Color(0xFF00C853), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }
@@ -202,7 +209,7 @@ fun MiuixFitDetectionScreen(
                     .height(48.dp)
             ) {
                 Text(
-                    text = if (state == MiuixFitState.RESULT) "Refaire le test" else "Démarrer le test",
+                    text = if (state == MiuixFitState.RESULT) stringRes("device_settings_fit_redetection") else stringRes("device_settings_start_fit_detection"),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp
                 )

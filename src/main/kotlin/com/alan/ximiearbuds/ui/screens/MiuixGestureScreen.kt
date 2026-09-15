@@ -25,6 +25,7 @@ import com.alan.ximiearbuds.ui.components.MiuixTopAppBar
 import com.alan.ximiearbuds.ui.components.XiaomiActionItem
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
 import com.alan.ximiearbuds.ui.components.XiaomiItemDivider
+import com.alan.ximiearbuds.ui.theme.stringRes
 
 /**
  * 1:1 replica of Xiaomi Earbuds `device_settings_fragment_gesture.xml`.
@@ -56,7 +57,7 @@ fun MiuixGestureScreen(
     ) {
         // Top MIUI Navigation Bar
         MiuixTopAppBar(
-            title = "Commandes tactiles",
+            title = stringRes("device_settings_gesture_operation"),
             onBackClick = onBackClick
         )
 
@@ -88,7 +89,7 @@ fun MiuixGestureScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Écouteur Gauche",
+                            text = stringRes("device_settings_find_side_left"),
                             color = if (selectedEar == 0) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             fontWeight = if (selectedEar == 0) FontWeight.SemiBold else FontWeight.Normal,
                             fontSize = 13.sp
@@ -105,7 +106,7 @@ fun MiuixGestureScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Écouteur Droit",
+                            text = stringRes("device_settings_find_side_right"),
                             color = if (selectedEar == 1) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             fontWeight = if (selectedEar == 1) FontWeight.SemiBold else FontWeight.Normal,
                             fontSize = 13.sp
@@ -118,7 +119,7 @@ fun MiuixGestureScreen(
 
             // Section Header: Actions au toucher
             Text(
-                text = "ACTIONS AU TOUCHER",
+                text = stringRes("device_settings_gesture_operation").uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -132,7 +133,7 @@ fun MiuixGestureScreen(
             XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
                 // Single Tap
                 XiaomiActionItem(
-                    title = "Appui simple",
+                    title = stringRes("device_settings_once_click_mbf"),
                     subtitle = formatGestureAction(currentGestures.singleTap),
                     onClick = { editingGestureType = "single" }
                 )
@@ -141,7 +142,7 @@ fun MiuixGestureScreen(
 
                 // Double Tap
                 XiaomiActionItem(
-                    title = "Double appui",
+                    title = stringRes("device_settings_double_click_mbf"),
                     subtitle = formatGestureAction(currentGestures.doubleTap),
                     onClick = { editingGestureType = "double" }
                 )
@@ -150,7 +151,7 @@ fun MiuixGestureScreen(
 
                 // Triple Tap
                 XiaomiActionItem(
-                    title = "Triple appui",
+                    title = stringRes("device_settings_triple_strike_mbf"),
                     subtitle = formatGestureAction(currentGestures.tripleTap),
                     onClick = { editingGestureType = "triple" }
                 )
@@ -159,7 +160,7 @@ fun MiuixGestureScreen(
 
                 // Long Press
                 XiaomiActionItem(
-                    title = "Appui long",
+                    title = stringRes("device_settings_long_press_mbf_two_seconds"),
                     subtitle = formatGestureAction(currentGestures.longPress),
                     onClick = { editingGestureType = "long" }
                 )
@@ -168,7 +169,7 @@ fun MiuixGestureScreen(
 
                 // Slide / Stem gesture
                 XiaomiActionItem(
-                    title = "Glissement sur la tige",
+                    title = stringRes("device_settings_volume_changed"),
                     subtitle = formatGestureAction(currentGestures.slide),
                     onClick = { editingGestureType = "slide" }
                 )
@@ -189,15 +190,15 @@ fun MiuixGestureScreen(
                     .padding(bottom = 32.dp)
             ) {
                 val actionTitle = when (gestureType) {
-                    "single" -> "Appui simple"
-                    "double" -> "Double appui"
-                    "triple" -> "Triple appui"
-                    "long" -> "Appui long"
-                    else -> "Glissement"
+                    "single" -> stringRes("device_settings_once_click_mbf")
+                    "double" -> stringRes("device_settings_double_click_mbf")
+                    "triple" -> stringRes("device_settings_triple_strike_mbf")
+                    "long" -> stringRes("device_settings_long_press_mbf_two_seconds")
+                    else -> stringRes("device_settings_volume_changed")
                 }
 
                 Text(
-                    text = "Choisir l'action pour : $actionTitle",
+                    text = actionTitle,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
@@ -206,14 +207,14 @@ fun MiuixGestureScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 val actions = listOf(
-                    GestureAction.PLAY_PAUSE to "Lecture / Pause",
-                    GestureAction.NEXT_TRACK to "Piste suivante",
-                    GestureAction.PREV_TRACK to "Piste précédente",
-                    GestureAction.NOISE_CONTROL to "Mode réduction de bruit",
-                    GestureAction.VOLUME_UP to "Augmenter le volume",
-                    GestureAction.VOLUME_DOWN to "Diminuer le volume",
-                    GestureAction.VOICE_ASSISTANT to "Assistant vocal",
-                    GestureAction.NONE to "Aucune action"
+                    GestureAction.PLAY_PAUSE to stringRes("device_settings_play_or_pause"),
+                    GestureAction.NEXT_TRACK to stringRes("device_settings_next_song"),
+                    GestureAction.PREV_TRACK to stringRes("device_settings_last_song"),
+                    GestureAction.NOISE_CONTROL to stringRes("device_settings_noise_control"),
+                    GestureAction.VOLUME_UP to stringRes("device_settings_volume_up"),
+                    GestureAction.VOLUME_DOWN to stringRes("device_settings_volume_down"),
+                    GestureAction.VOICE_ASSISTANT to stringRes("device_settings_awake_voice_assistant"),
+                    GestureAction.NONE to stringRes("device_settings_click_cancle")
                 )
 
                 val currentAction = when (gestureType) {
@@ -291,16 +292,17 @@ private fun updateEarbudGesture(
     controller.updateGestures(updatedSettings)
 }
 
+@Composable
 private fun formatGestureAction(action: GestureAction): String {
     return when (action) {
-        GestureAction.PLAY_PAUSE -> "Lecture / Pause"
-        GestureAction.NEXT_TRACK -> "Piste suivante"
-        GestureAction.PREV_TRACK -> "Piste précédente"
-        GestureAction.NOISE_CONTROL -> "Mode réduction de bruit"
-        GestureAction.VOLUME_UP -> "Volume +"
-        GestureAction.VOLUME_DOWN -> "Volume -"
-        GestureAction.VOICE_ASSISTANT -> "Assistant vocal"
-        GestureAction.NONE -> "Aucun"
-        else -> "Autre"
+        GestureAction.PLAY_PAUSE -> stringRes("device_settings_play_or_pause")
+        GestureAction.NEXT_TRACK -> stringRes("device_settings_next_song")
+        GestureAction.PREV_TRACK -> stringRes("device_settings_last_song")
+        GestureAction.NOISE_CONTROL -> stringRes("device_settings_noise_control")
+        GestureAction.VOLUME_UP -> stringRes("device_settings_volume_up")
+        GestureAction.VOLUME_DOWN -> stringRes("device_settings_volume_down")
+        GestureAction.VOICE_ASSISTANT -> stringRes("device_settings_awake_voice_assistant")
+        GestureAction.NONE -> stringRes("device_settings_click_cancle")
+        else -> stringRes("device_settings_others")
     }
 }

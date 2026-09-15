@@ -6,7 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,14 +23,13 @@ import com.alan.ximiearbuds.ui.components.MiuixTopAppBar
 import com.alan.ximiearbuds.ui.components.XiaomiActionItem
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
 import com.alan.ximiearbuds.ui.components.XiaomiItemDivider
+import com.alan.ximiearbuds.ui.theme.XiaomiCyan
+import com.alan.ximiearbuds.ui.theme.XiaomiRed
+import com.alan.ximiearbuds.ui.theme.stringRes
 
 /**
  * 1:1 replica of Xiaomi Earbuds `device_settings_fragment_find_device.xml`.
- * 
- * Replaces popup dialog with an authentic full-screen MIUI fragment:
- * - Warning card for acoustic protection
- * - Independent Left and Right chime triggers
- * - Sound wave chime indicator
+ * Fully wired to official MIUI strings.
  */
 @Composable
 fun MiuixFindDeviceScreen(
@@ -49,7 +48,7 @@ fun MiuixFindDeviceScreen(
     ) {
         // Top Navigation Bar
         MiuixTopAppBar(
-            title = "Localiser les écouteurs",
+            title = stringRes("device_settings_find_device"),
             onBackClick = {
                 if (ringingLeft || ringingRight) {
                     controller.stopRinging()
@@ -71,13 +70,13 @@ fun MiuixFindDeviceScreen(
                 modifier = Modifier
                     .size(72.dp)
                     .clip(RoundedCornerShape(36.dp))
-                    .background(Color(0x1A007AFF)),
+                    .background(XiaomiCyan.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.VolumeUp,
+                    imageVector = Icons.AutoMirrored.Filled.VolumeUp,
                     contentDescription = null,
-                    tint = Color(0xFF007AFF),
+                    tint = XiaomiCyan,
                     modifier = Modifier.size(36.dp)
                 )
             }
@@ -85,14 +84,14 @@ fun MiuixFindDeviceScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Faire sonner les écouteurs",
+                text = stringRes("device_settings_find"),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground
             )
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Warning Box
+            // Warning Box (device_settings_find_desc)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -109,7 +108,7 @@ fun MiuixFindDeviceScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Ne déclenchez pas la sonnerie si vous portez les écouteurs dans les oreilles afin de préserver votre audition.",
+                        text = stringRes("device_settings_find_desc"),
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                         lineHeight = 16.sp
@@ -123,8 +122,8 @@ fun MiuixFindDeviceScreen(
             XiaomiCardContainer(modifier = Modifier.fillMaxWidth()) {
                 // Left Earbud Chime
                 XiaomiActionItem(
-                    title = "Écouteur gauche",
-                    subtitle = if (ringingLeft) "Sonnerie en cours..." else "Appuyez pour faire sonner",
+                    title = stringRes("device_settings_find_side_left"),
+                    subtitle = if (ringingLeft) stringRes("device_settings_find_left_playing") else stringRes("login_guide_find_earphone_detail"),
                     onClick = {
                         ringingLeft = !ringingLeft
                         if (ringingLeft) {
@@ -139,8 +138,8 @@ fun MiuixFindDeviceScreen(
 
                 // Right Earbud Chime
                 XiaomiActionItem(
-                    title = "Écouteur droit",
-                    subtitle = if (ringingRight) "Sonnerie en cours..." else "Appuyez pour faire sonner",
+                    title = stringRes("device_settings_find_side_right"),
+                    subtitle = if (ringingRight) stringRes("device_settings_find_right_playing") else stringRes("login_guide_find_earphone_detail"),
                     onClick = {
                         ringingRight = !ringingRight
                         if (ringingRight) {
@@ -167,7 +166,7 @@ fun MiuixFindDeviceScreen(
                     }
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (ringingLeft || ringingRight) Color(0xFFFF3B30) else Color(0xFF007AFF),
+                    containerColor = if (ringingLeft || ringingRight) XiaomiRed else XiaomiCyan,
                     contentColor = Color.White
                 ),
                 shape = RoundedCornerShape(14.dp),
@@ -176,7 +175,7 @@ fun MiuixFindDeviceScreen(
                     .height(48.dp)
             ) {
                 Text(
-                    text = if (ringingLeft || ringingRight) "Arrêter la sonnerie" else "Faire sonner les deux écouteurs",
+                    text = if (ringingLeft || ringingRight) stringRes("device_settings_audio_play_status_pause") else stringRes("device_settings_find"),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp
                 )

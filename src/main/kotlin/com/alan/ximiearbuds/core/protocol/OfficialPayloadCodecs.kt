@@ -153,10 +153,11 @@ object OfficialPayloadCodecs {
     // 4. SPATIAL AUDIO (Config 29)
     // -------------------------------------------------------------
     data class SpatialAudioConfig(
-        val isOpen: Boolean,
-        val preference: Int,      // 0 = High quality, 1 = Low latency
-        val headTracking: Boolean,
-        val virtualSurround: Boolean
+        val isOpen: Boolean = false,
+        val preference: Int = 1,      // 0 = High quality, 1 = Low latency
+        val headTracking: Boolean = false,
+        val virtualSurround: Boolean = false,
+        val sceneRenderingMode: Int = 0 // 0 = Default, 1 = Cinema, 2 = Game, 3 = Music
     ) {
         fun encode(): ByteArray {
             val bit7 = if (isOpen) '1' else '0'
@@ -185,7 +186,8 @@ object OfficialPayloadCodecs {
                 val preference = (byteVal shr 1) and 0x03
                 val headTracking = (byteVal and 0x08) != 0
                 val virtualSurround = (byteVal and 0x10) != 0
-                return SpatialAudioConfig(isOpen, preference, headTracking, virtualSurround)
+                val sceneMode = if (bytes.size > 1) bytes[1].toInt() and 0xFF else 0
+                return SpatialAudioConfig(isOpen, preference, headTracking, virtualSurround, sceneMode)
             }
         }
     }
@@ -287,4 +289,121 @@ object OfficialPayloadCodecs {
         fun encode(enabled: Boolean): ByteArray = byteArrayOf(if (enabled) 1 else 0)
         fun decode(bytes: ByteArray): Boolean = bytes.isNotEmpty() && bytes[0].toInt() == 1
     }
+
+    // -------------------------------------------------------------
+    // 8. DONGLE 2.4GHz GAMING CONFIGS (Configs 77, 81, 82)
+    // -------------------------------------------------------------
+    data class DongleConfig(
+        val dongleMode: Int = 1, // 0 = Lossless, 1 = Low Latency, 2 = Wireless Mic
+        val monitorSwitch: Boolean = false,
+        val monitorVolume: Int = 50 // 0-100
+    ) {
+        fun encodeMode(): ByteArray = byteArrayOf(dongleMode.toByte())
+        fun encodeMonitor(): ByteArray = byteArrayOf(if (monitorSwitch) 1 else 0, monitorVolume.coerceIn(0, 100).toByte())
+
+        companion object {
+            fun decode(bytes: ByteArray): DongleConfig {
+                if (bytes.isEmpty()) return DongleConfig()
+                val mode = bytes[0].toInt() and 0xFF
+                val monSwitch = if (bytes.size > 1) (bytes[1].toInt() and 0xFF) == 1 else false
+                val monVol = if (bytes.size > 2) bytes[2].toInt() and 0xFF else 50
+                return DongleConfig(mode, monSwitch, monVol)
+            }
+        }
+    }
+
+    // -------------------------------------------------------------
+    // 10. SPORTS & SWIM POOL (Config 84)
+    // -------------------------------------------------------------
+    data class SwimPoolConfig(
+        val currentLengthFlag: Int = 1, // 1 = 25m, 2 = 50m, 255 = custom
+        val customLength: Int = 25
+    ) {
+        fun encode(): ByteArray {
+            return if (currentLengthFlag != 255) {
+                byteArrayOf((currentLengthFlag and 0xFF).toByte())
+            } else {
+                byteArrayOf(
+                    0xFF.toByte(),
+                    ((customLength shr 8) and 0xFF).toByte(),
+                    (customLength and 0xFF).toByte(),
+                    0, 0, 0, 0
+                )
+            }
+        }
+
+        companion object {
+            fun decode(bytes: ByteArray): SwimPoolConfig {
+                if (bytes.isEmpty()) return SwimPoolConfig()
+                val flag = bytes[0].toInt() and 0xFF
+                val custom = if (flag == 255 && bytes.size >= 3) {
+                    ((bytes[1].toInt() and 0xFF) shl 8) or (bytes[2].toInt() and 0xFF)
+                } else if (flag == 2) 50 else 25
+                return SwimPoolConfig(flag, custom)
+            }
+        }
+    }
+
+    // -------------------------------------------------------------
+    // 11. REMIND LOST / LAB ANTI-LOST (Config 12)
+    // -------------------------------------------------------------
+    data class RemindLostConfig(
+        val isEnabled: Boolean = true,
+        val leftInBox: Boolean = false,
+        val leftWear: Boolean = true,
+        val rightInBox: Boolean = false,
+        val rightWear: Boolean = true
+    ) {
+        fun encode(): ByteArray {
+            var b = 0
+            if (isEnabled) b = b or 0x01
+            if (leftInBox) b = b or 0x02
+            if (leftWear) b = b or 0x04
+            if (rightInBox) b = b or 0x08
+            if (rightWear) b = b or 0x10
+            return byteArrayOf(b.toByte())
+        }
+
+        companion object {
+            fun decode(bytes: ByteArray): RemindLostConfig {
+                if (bytes.isEmpty()) return RemindLostConfig()
+                val b = bytes[0].toInt() and 0xFF
+                return RemindLostConfig(
+                    isEnabled = (b and 0x01) != 0,
+                    leftInBox = (b and 0x02) != 0,
+                    leftWear = (b and 0x04) != 0,
+                    rightInBox = (b and 0x08) != 0,
+                    rightWear = (b and 0x10) != 0
+                )
+            }
+        }
+    }
+
+    // -------------------------------------------------------------
+    // 12. XIAOAI & VOICE ASSISTANT (Configs 68, 69, 70)
+    // -------------------------------------------------------------
+    data class XiaoAiConfig(
+        val wakeUpWordOpen: Boolean = true,
+        val continuousDialogueOpen: Boolean = false,
+        val timbre: Int = 1 // 1 = Classic, 2 = Gentle, 3 = Energetic
+    ) {
+        fun encode(): ByteArray {
+            return byteArrayOf(
+                if (wakeUpWordOpen) 1 else 0,
+                if (continuousDialogueOpen) 1 else 0,
+                timbre.toByte()
+            )
+        }
+
+        companion object {
+            fun decode(bytes: ByteArray): XiaoAiConfig {
+                if (bytes.isEmpty()) return XiaoAiConfig()
+                val wake = bytes[0].toInt() == 1
+                val cont = if (bytes.size > 1) bytes[1].toInt() == 1 else false
+                val tim = if (bytes.size > 2) bytes[2].toInt() and 0xFF else 1
+                return XiaoAiConfig(wake, cont, tim)
+            }
+        }
+    }
 }
+

@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alan.ximiearbuds.core.device.EarbudsController
 import com.alan.ximiearbuds.ui.components.*
+import com.alan.ximiearbuds.ui.theme.stringRes
 
 /**
  * 1:1 replica of Xiaomi Earbuds `device_settings_activity_soundeffect.xml`.
@@ -34,6 +35,7 @@ fun MiuixSoundEffectsScreen(
     controller: EarbudsController,
     onBackClick: () -> Unit,
     onNavigateToEqualizer: () -> Unit,
+    onNavigateToSpatialAudio: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -49,7 +51,7 @@ fun MiuixSoundEffectsScreen(
     ) {
         // Top Navigation Bar
         MiuixTopAppBar(
-            title = "Effets sonores",
+            title = stringRes("device_settings_sound_settings"),
             onBackClick = onBackClick
         )
 
@@ -64,7 +66,7 @@ fun MiuixSoundEffectsScreen(
 
             // Section 1: Spatial & Surround Audio
             Text(
-                text = "EXPÉRIENCE AUDIO",
+                text = stringRes("device_settings_sound_settings").uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -75,9 +77,18 @@ fun MiuixSoundEffectsScreen(
             )
 
             XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
+                if (onNavigateToSpatialAudio != null) {
+                    XiaomiActionItem(
+                        title = stringRes("device_settings_sound_spatial_audio"),
+                        subtitle = stringRes("device_settings_spatial_audio_effect"),
+                        onClick = onNavigateToSpatialAudio
+                    )
+                    XiaomiItemDivider()
+                }
+
                 XiaomiSwitchItem(
-                    title = "Son surround virtuel",
-                    subtitle = "Offre une scène sonore 3D immersive et enveloppante",
+                    title = stringRes("device_settings_sound_virtual_surround"),
+                    subtitle = stringRes("device_settings_sound_virtual_surround_desc"),
                     checked = virtualSurround,
                     onCheckedChange = { virtualSurround = it }
                 )
@@ -85,8 +96,8 @@ fun MiuixSoundEffectsScreen(
                 XiaomiItemDivider()
 
                 XiaomiSwitchItem(
-                    title = "Volume adaptatif",
-                    subtitle = "Ajuste automatiquement le volume d'écoute selon le bruit ambiant",
+                    title = stringRes("device_settings_sound_adaptive_volume"),
+                    subtitle = stringRes("device_settings_sound_adaptive_volume_desc"),
                     checked = adaptiveVolume,
                     onCheckedChange = { adaptiveVolume = it }
                 )
@@ -94,8 +105,8 @@ fun MiuixSoundEffectsScreen(
                 XiaomiItemDivider()
 
                 XiaomiSwitchItem(
-                    title = "Adaptation auditive",
-                    subtitle = "Compense les fréquences selon votre sensibilité auditive",
+                    title = stringRes("device_settings_sound_personalized"),
+                    subtitle = stringRes("device_settings_personal_audio_desc"),
                     checked = audibilityAdaptation,
                     onCheckedChange = { audibilityAdaptation = it }
                 )
@@ -105,7 +116,7 @@ fun MiuixSoundEffectsScreen(
 
             // Section 2: Notification Volume Slider (Replicates NotificationVolumeSeekbar)
             Text(
-                text = "VOLUME DES NOTIFICATIONS",
+                text = stringRes("device_settings_notification_volume_title").uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -127,7 +138,7 @@ fun MiuixSoundEffectsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Volume des alertes et bips",
+                            text = stringRes("device_settings_notification_volume_subtitle"),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -157,7 +168,7 @@ fun MiuixSoundEffectsScreen(
 
             // Section 3: Equalizer Entry point (Replicates include customized_eq)
             Text(
-                text = "ÉGALISEUR AUDIO",
+                text = stringRes("device_settings_audio_equalizer").uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -169,8 +180,8 @@ fun MiuixSoundEffectsScreen(
 
             XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
                 XiaomiActionItem(
-                    title = "Égaliseur personnalisé 10 bandes",
-                    subtitle = "Personnalisez la courbe fréquentielle ou choisissez un profil",
+                    title = stringRes("device_settings_audio_equalizer"),
+                    subtitle = stringRes("device_settings_play_a_song_to_use_this_feature"),
                     onClick = onNavigateToEqualizer
                 )
             }

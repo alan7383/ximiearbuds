@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,6 +27,7 @@ fun XiaomiHeroBanner(
     isConnected: Boolean,
     colorType: Int = 0,
     onColorSelected: ((Int) -> Unit)? = null,
+    onSkinClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val effectiveColor = if (colorType > 0) colorType else model?.defaultColor ?: 1
@@ -40,7 +42,11 @@ fun XiaomiHeroBanner(
         Box(
             modifier = Modifier
                 .height(180.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .then(
+                    if (onSkinClick != null) Modifier.clip(RoundedCornerShape(12.dp)).clickable { onSkinClick() }
+                    else Modifier
+                ),
             contentAlignment = Alignment.Center
         ) {
             XiaomiDeviceImage(

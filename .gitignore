@@ -7,3 +7,6 @@ local.properties
 .DS_Store
 hs_err_pid*
 *.log
+decompiled
+decompiled/
+ximiearbuds_decompiled/

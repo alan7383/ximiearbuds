@@ -24,6 +24,7 @@ import com.alan.ximiearbuds.core.protocol.EqBand
 import com.alan.ximiearbuds.core.protocol.EqPreset
 import com.alan.ximiearbuds.ui.components.MiuixTopAppBar
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
+import com.alan.ximiearbuds.ui.theme.stringRes
 
 /**
  * 1:1 replica of Xiaomi Earbuds `device_settings_fragment_customized_eq.xml`.
@@ -32,7 +33,7 @@ import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
  * - Top navigation bar with back arrow
  * - Preset selector chips (Standard, Vocal, Treble, Bass, Custom)
  * - 10-Band graphic equalizer with vertical gain bars (-10 dB to +10 dB)
- * - Curve reset button
+ * - Curve reset button with official confirmation dialog
  */
 @Composable
 fun MiuixEqualizerScreen(
@@ -42,6 +43,31 @@ fun MiuixEqualizerScreen(
 ) {
     val eqState by controller.equalizer.collectAsState()
     val scrollState = rememberScrollState()
+    var showResetDialog by remember { mutableStateOf(false) }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text(stringRes("device_settings_audio_equalizer"), fontWeight = FontWeight.Bold) },
+            text = { Text(stringRes("device_settings_whether_to_clear_equalizer_params")) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        controller.resetEq()
+                        showResetDialog = false
+                    }
+                ) {
+                    Text(stringRes("device_settings_fit_detection_dialog_confirm"), color = Color(0xFF007AFF), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text(stringRes("device_settings_dialog_cancle"))
+                }
+            },
+            shape = RoundedCornerShape(18.dp)
+        )
+    }
 
     Column(
         modifier = modifier
@@ -50,13 +76,13 @@ fun MiuixEqualizerScreen(
     ) {
         // Top MIUI Navigation Bar
         MiuixTopAppBar(
-            title = "Égaliseur personnalisé",
+            title = stringRes("device_settings_audio_equalizer"),
             onBackClick = onBackClick,
             actions = {
-                IconButton(onClick = { controller.resetEq() }) {
+                IconButton(onClick = { showResetDialog = true }) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
-                        contentDescription = "Réinitialiser",
+                        contentDescription = stringRes("device_settings_whether_to_clear_equalizer_params"),
                         tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                         modifier = Modifier.size(20.dp)
                     )
@@ -75,7 +101,7 @@ fun MiuixEqualizerScreen(
 
             // Presets Section Header
             Text(
-                text = "PRÉRÉGLAGES SONORES",
+                text = stringRes("device_settings_sound_settings").uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -89,11 +115,11 @@ fun MiuixEqualizerScreen(
             XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
                 Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
                     val presets = listOf(
-                        EqPreset.STANDARD to "Par défaut",
-                        EqPreset.VOICE to "Voix claire",
-                        EqPreset.TREBLE to "Aigus renforcés",
-                        EqPreset.BASS to "Basses renforcées",
-                        EqPreset.CUSTOM to "Personnalisé"
+                        EqPreset.STANDARD to stringRes("device_settings_sound_balanced"),
+                        EqPreset.VOICE to stringRes("device_settings_sound_vocal_enhancement"),
+                        EqPreset.TREBLE to stringRes("device_settings_sound_treble_boost"),
+                        EqPreset.BASS to stringRes("device_settings_sound_bass_boost"),
+                        EqPreset.CUSTOM to stringRes("device_settings_sound_custom")
                     )
 
                     Row(

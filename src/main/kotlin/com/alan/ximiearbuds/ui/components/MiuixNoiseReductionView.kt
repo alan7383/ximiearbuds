@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alan.ximiearbuds.core.protocol.AncLevel
 import com.alan.ximiearbuds.core.protocol.NoiseControlState
+import com.alan.ximiearbuds.ui.theme.stringRes
 import com.alan.ximiearbuds.core.protocol.NoiseMode
 import com.alan.ximiearbuds.core.protocol.TransparencyLevel
 
@@ -70,7 +71,7 @@ fun MiuixNoiseReductionView(
         ) {
             // 1. Transparency (noise_reduction_transparent)
             MiuixNoiseRadioItem(
-                label = "Transparence",
+                label = stringRes("device_settings_notification_transparency_mode"),
                 isSelected = noiseState.mode == NoiseMode.TRANSPARENCY,
                 normalDrawable = "drawable/device_settings_trans.webp",
                 checkedDrawable = "drawable/device_settings_trans_checked.webp",
@@ -80,7 +81,7 @@ fun MiuixNoiseReductionView(
 
             // 2. Active Noise Cancellation (noise_reduction_open)
             MiuixNoiseRadioItem(
-                label = "Réduction de bruit",
+                label = stringRes("device_settings_noise_control"),
                 isSelected = noiseState.mode == NoiseMode.ANC,
                 normalDrawable = "drawable/device_settings_noise.webp",
                 checkedDrawable = "drawable/device_settings_noise_checked.webp",
@@ -90,7 +91,7 @@ fun MiuixNoiseReductionView(
 
             // 3. Off (noise_reduction_close)
             MiuixNoiseRadioItem(
-                label = "Désactivé",
+                label = stringRes("device_settings_noise_close"),
                 isSelected = noiseState.mode == NoiseMode.OFF,
                 normalDrawable = "drawable/device_settings_noise_close.webp",
                 checkedDrawable = "drawable/device_settings_noise_close_checked.webp",
@@ -124,12 +125,12 @@ fun MiuixNoiseReductionView(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Réduction intelligente adaptative",
+                            text = stringRes("device_settings_smart_denoise"),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Ajuste automatiquement la profondeur selon l'environnement",
+                            text = stringRes("device_settings_noise_reduction_adaptive_noise"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
                         )
@@ -183,12 +184,12 @@ fun MiuixNoiseReductionView(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Légère",
+                            text = stringRes("device_settings_mild"),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                         )
                         Text(
-                            text = "Profonde",
+                            text = stringRes("device_settings_deep"),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                         )
@@ -212,7 +213,7 @@ fun MiuixNoiseReductionView(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Profil de transparence",
+                    text = stringRes("device_settings_notification_transparency_mode"),
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -223,19 +224,19 @@ fun MiuixNoiseReductionView(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     MiuixProfileChip(
-                        label = "Standard",
+                        label = stringRes("device_settings_scene_standard"),
                         selected = noiseState.transparencyLevel == TransparencyLevel.REGULAR,
                         onClick = { onTransparencyLevelChange(TransparencyLevel.REGULAR) },
                         modifier = Modifier.weight(1f)
                     )
                     MiuixProfileChip(
-                        label = "Voix",
+                        label = stringRes("device_settings_noise_reduction_transparent_person"),
                         selected = noiseState.transparencyLevel == TransparencyLevel.VOCAL,
                         onClick = { onTransparencyLevelChange(TransparencyLevel.VOCAL) },
                         modifier = Modifier.weight(1f)
                     )
                     MiuixProfileChip(
-                        label = "Ambiance",
+                        label = stringRes("device_settings_noise_reduction_transparent_environment"),
                         selected = noiseState.transparencyLevel == TransparencyLevel.AMBIENT,
                         onClick = { onTransparencyLevelChange(TransparencyLevel.AMBIENT) },
                         modifier = Modifier.weight(1f)

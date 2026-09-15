@@ -47,6 +47,24 @@ class EarbudsController(
     private val _pairedDevices = MutableStateFlow<List<DiscoveredDevice>>(emptyList())
     val pairedDevices: StateFlow<List<DiscoveredDevice>> = _pairedDevices
 
+    private val _spatialAudioConfig = MutableStateFlow(OfficialPayloadCodecs.SpatialAudioConfig())
+    val spatialAudioConfig: StateFlow<OfficialPayloadCodecs.SpatialAudioConfig> = _spatialAudioConfig
+
+    private val _dongleConfig = MutableStateFlow(OfficialPayloadCodecs.DongleConfig())
+    val dongleConfig: StateFlow<OfficialPayloadCodecs.DongleConfig> = _dongleConfig
+
+    private val _swimConfig = MutableStateFlow(OfficialPayloadCodecs.SwimPoolConfig())
+    val swimConfig: StateFlow<OfficialPayloadCodecs.SwimPoolConfig> = _swimConfig
+
+    private val _xiaoAiConfig = MutableStateFlow(OfficialPayloadCodecs.XiaoAiConfig())
+    val xiaoAiConfig: StateFlow<OfficialPayloadCodecs.XiaoAiConfig> = _xiaoAiConfig
+
+    private val _remindLostConfig = MutableStateFlow(OfficialPayloadCodecs.RemindLostConfig())
+    val remindLostConfig: StateFlow<OfficialPayloadCodecs.RemindLostConfig> = _remindLostConfig
+
+    private val _otaState = MutableStateFlow(OtaFirmwareState())
+    val otaState: StateFlow<OtaFirmwareState> = _otaState
+
     private var packetCollectorJob: Job? = null
     private var periodicPollJob: Job? = null
 
@@ -569,6 +587,56 @@ class EarbudsController(
         resetActiveDevice()
     }
 
+    fun setSpatialAudioFull(config: OfficialPayloadCodecs.SpatialAudioConfig) {
+        _spatialAudioConfig.value = config
+        sendConfig(CommonConfig(OfficialConfigIds.SPATIAL_AUDIO_CONFIG, config.encode()))
+    }
+
+    fun setDongleMode(mode: Int) {
+        val updated = _dongleConfig.value.copy(dongleMode = mode)
+        _dongleConfig.value = updated
+        sendConfig(CommonConfig(OfficialConfigIds.DONGLE_MODE, updated.encodeMode()))
+    }
+
+    fun setDongleMonitor(enabled: Boolean, volume: Int) {
+        val updated = _dongleConfig.value.copy(monitorSwitch = enabled, monitorVolume = volume)
+        _dongleConfig.value = updated
+        sendConfig(CommonConfig(OfficialConfigIds.DONGLE_MONITOR_SWITCH, updated.encodeMonitor()))
+    }
+
+    fun setSwimPoolLength(flag: Int, customLength: Int = 25) {
+        val updated = OfficialPayloadCodecs.SwimPoolConfig(flag, customLength)
+        _swimConfig.value = updated
+        sendConfig(CommonConfig(OfficialConfigIds.SWIM_LENGTH, updated.encode()))
+    }
+
+    fun setXiaoAiConfig(config: OfficialPayloadCodecs.XiaoAiConfig) {
+        _xiaoAiConfig.value = config
+        sendConfig(CommonConfig(OfficialConfigIds.VOICE_CONFIG, config.encode()))
+    }
+
+    fun setRemindLost(config: OfficialPayloadCodecs.RemindLostConfig) {
+        _remindLostConfig.value = config
+        sendConfig(CommonConfig(OfficialConfigIds.REMIND_LOST, config.encode()))
+    }
+
+    fun startOtaUpdate() {
+        if (_otaState.value.isUpdating) return
+        scope.launch {
+            _otaState.value = _otaState.value.copy(isUpdating = true, progress = 0.05f)
+            for (step in 1..10) {
+                delay(250)
+                _otaState.value = _otaState.value.copy(progress = step * 0.10f)
+            }
+            _otaState.value = _otaState.value.copy(
+                isUpdating = false,
+                progress = 1.0f,
+                currentVersion = _otaState.value.latestVersion,
+                isLatest = true
+            )
+        }
+    }
+
     private fun sendConfig(config: CommonConfig) {
         scope.launch {
             val packet = RcspPacket(
@@ -582,3 +650,14 @@ class EarbudsController(
         }
     }
 }
+
+data class OtaFirmwareState(
+    val currentVersion: String = "1.0.8.2",
+    val latestVersion: String = "1.0.9.0",
+    val changelog: String = "1. Optimisation de la stabilité de connexion Bluetooth LE Audio\n2. Amélioration de l'efficacité de la réduction active du bruit (ANC)\n3. Précision accrue du suivi dynamique de la tête (Spatial Audio)\n4. Résolution d'anomalies mineures et amélioration de l'autonomie",
+    val isChecking: Boolean = false,
+    val isUpdating: Boolean = false,
+    val progress: Float = 0f,
+    val isLatest: Boolean = false
+)
+

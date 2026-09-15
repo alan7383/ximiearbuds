@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alan.ximiearbuds.core.protocol.BatteryInfo
 import com.alan.ximiearbuds.core.protocol.TargetDeviceInfo
+import com.alan.ximiearbuds.ui.theme.stringRes
 
 /**
  * Authentic 1:1 replica of Xiaomi Earbuds `device_settings_layout_battery.xml` and `BatteryView.java`.
@@ -56,7 +57,7 @@ fun MiuixBatteryContainer(
         ) {
             // Left Earbud Column
             MiuixBatteryColumn(
-                label = "Gauche",
+                label = stringRes("device_settings_find_side_left"),
                 percentage = if (deviceInfo.leftBattery.isConnected && deviceInfo.leftBattery.percentage >= 0) deviceInfo.leftBattery.percentage else null,
                 isCharging = deviceInfo.leftBattery.isCharging,
                 modifier = Modifier.weight(1f)
@@ -72,7 +73,7 @@ fun MiuixBatteryContainer(
 
             // Right Earbud Column
             MiuixBatteryColumn(
-                label = "Droite",
+                label = stringRes("device_settings_find_side_right"),
                 percentage = if (deviceInfo.rightBattery.isConnected && deviceInfo.rightBattery.percentage >= 0) deviceInfo.rightBattery.percentage else null,
                 isCharging = deviceInfo.rightBattery.isCharging,
                 modifier = Modifier.weight(1f)
@@ -88,7 +89,7 @@ fun MiuixBatteryContainer(
 
             // Charging Case Column
             MiuixBatteryColumn(
-                label = "Boîtier",
+                label = stringRes("device_settings_box"),
                 percentage = if (deviceInfo.caseBattery.isConnected && deviceInfo.caseBattery.percentage >= 0) deviceInfo.caseBattery.percentage else null,
                 isCharging = deviceInfo.caseBattery.isCharging,
                 modifier = Modifier.weight(1f)

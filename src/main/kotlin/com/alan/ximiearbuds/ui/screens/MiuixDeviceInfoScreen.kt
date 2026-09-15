@@ -15,8 +15,10 @@ import androidx.compose.ui.unit.sp
 import com.alan.ximiearbuds.core.device.EarbudsModel
 import com.alan.ximiearbuds.core.protocol.TargetDeviceInfo
 import com.alan.ximiearbuds.ui.components.MiuixTopAppBar
+import com.alan.ximiearbuds.ui.components.XiaomiActionItem
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
 import com.alan.ximiearbuds.ui.components.XiaomiItemDivider
+import com.alan.ximiearbuds.ui.theme.stringRes
 
 /**
  * 1:1 replica of Xiaomi Earbuds `device_settings_fragment_device_info.xml`.
@@ -26,6 +28,7 @@ fun MiuixDeviceInfoScreen(
     deviceInfo: TargetDeviceInfo,
     activeModel: EarbudsModel?,
     onBackClick: () -> Unit,
+    onNavigateToGuide: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -37,7 +40,7 @@ fun MiuixDeviceInfoScreen(
     ) {
         // Top Navigation Bar
         MiuixTopAppBar(
-            title = "À propos de l'appareil",
+            title = stringRes("device_settings_about_device"),
             onBackClick = onBackClick
         )
 
@@ -52,7 +55,7 @@ fun MiuixDeviceInfoScreen(
 
             // Section Header: Matériel
             Text(
-                text = "INFORMATIONS MATÉRIELLES",
+                text = stringRes("device_settings_equipment_manual").uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -76,7 +79,7 @@ fun MiuixDeviceInfoScreen(
 
             // Section Header: Logiciel
             Text(
-                text = "VERSION LOGICIELLE",
+                text = stringRes("device_settings_check_update").uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -92,6 +95,30 @@ fun MiuixDeviceInfoScreen(
                 MiuixInfoRow("Code version", "${deviceInfo.versionCode}")
                 XiaomiItemDivider()
                 MiuixInfoRow("Version protocole RCSP", "v2.1 (Actions/BES)")
+            }
+
+            if (onNavigateToGuide != null) {
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = stringRes("device_settings_beginner_guide").uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.sp,
+                        letterSpacing = 0.5.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
+                )
+
+                XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
+                    XiaomiActionItem(
+                        title = stringRes("device_settings_beginner_guide"),
+                        subtitle = stringRes("device_settings_record_settings_guide_subtitle"),
+                        iconRes = "drawable/device_settings_ic_about_device.webp",
+                        onClick = onNavigateToGuide
+                    )
+                }
             }
         }
     }

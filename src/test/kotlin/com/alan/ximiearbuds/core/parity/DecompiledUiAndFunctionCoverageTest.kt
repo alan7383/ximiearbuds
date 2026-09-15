@@ -105,7 +105,9 @@ class DecompiledUiAndFunctionCoverageTest {
                 "FUNC_SOUND_SETTING_VIRTUAL_SURROUND", "FUNC_SOUND_SETTING_SPATIAL_AUDIO_HEAD_TRACKING",
                 "FUNC_SOUND_SETTING_SPATIAL_AUDIO_PREFERENCE", "FUNC_SOUND_SETTING_SPATIAL_AUDIO_VIRTUAL_SURROUND",
                 "FUNC_SOUND_SETTING_CLOSE_SPATIAL_AUDIO", "FUNC_SOUND_SETTINGS_SPATIAL_AUDIO_NOTIFY",
-                "FUNC_AUDIBILITY_ADAPTATION", "FUNC_SOUND_SETTINGS_ADAPTIVE_SENSE", "FUNC_NOTIFICATION_VOLUME" -> true
+                "FUNC_AUDIBILITY_ADAPTATION", "FUNC_SOUND_SETTINGS_ADAPTIVE_SENSE", "FUNC_NOTIFICATION_VOLUME",
+                "FUNC_SOUND_EFFECT_RENDERING", "FUNC_SOUND_SETTINGS_SOUND_MODE_OTA", "FUNC_PERSONAL_SPATIAL_AUDIO",
+                "FUNC_AUDIO_MODE" -> true
 
                 // Gestures
                 "FUNC_GESTURE_DOUBLE_CLICK", "FUNC_GESTURE_TRIPLE_CLICK", "FUNC_GESTURE_LONG_PRESS",
@@ -116,15 +118,26 @@ class DecompiledUiAndFunctionCoverageTest {
 
                 // Smart & Connectivity
                 "FUNC_DUAL_DEVICE_CONNECTION", "FUNC_LOW_LATENCY", "FUNC_WEAR_DETECTION",
-                "FUNC_AUTO_PICK_CALL", "FUNC_SMART_FREE_PICK", "FUNC_VOICE_CONTROL" -> true
+                "FUNC_AUTO_PICK_CALL", "FUNC_SMART_FREE_PICK", "FUNC_VOICE_CONTROL",
+                "FUNC_HEARING_HEALTH", "FUNC_NOTIFICATION", "FUNC_AUTO_GAMING_MODE",
+                "FUNC_CUSTOM_SKIN", "FUNC_NOTIFICATION_TTS" -> true
 
-                // Hardware
-                "FUNC_FIND_DEVICE", "FUNC_BEGINNER_GUIDE", "FUNC_DEVICE_INTRODUCE" -> true
+                // Hardware & Tools
+                "FUNC_FIND_DEVICE", "FUNC_BEGINNER_GUIDE", "FUNC_DEVICE_INTRODUCE",
+                "FUNC_DEVICE_RECORD", "FUNC_DEVICE_TRANSLATE", "FUNC_FIRMWARE_UPDATE",
+                "FUNC_EXERCISE_REPORT", "SUPER_AI" -> true
 
-                // Lab & Calibration (partially wired in dialogs/codecs)
-                "FUNC_FIT_DETECT", "FUNC_EARBOX_SOUND", "FUNC_EAR_CANAL_DETECTION" -> true
+                // Lab & Calibration
+                "FUNC_FIT_DETECT", "FUNC_EARBOX_SOUND", "FUNC_EAR_CANAL_DETECTION",
+                "FUNC_LABORATORY_NOISE", "FUNC_LABORATORY_WEAR_DETECTION" -> true
 
-                // Others pending
+                // USB Dongle & Gaming
+                "FUNC_USB_MODE", "FUNC_USB_EAR_MONITOR", "FUNC_USB_CLICK",
+                "FUNC_USB_DOUBLE_CLICK", "FUNC_USB_LONG_PRESS" -> true
+
+                // Sports
+                "FUNC_SWIM_LENGTH" -> true
+
                 else -> false
             }
             implementedMap[fn.name] = isImplemented
@@ -153,8 +166,8 @@ class DecompiledUiAndFunctionCoverageTest {
         }
         println("========================================================\n")
 
-        // Assert baseline: We have verified at least 40 functions are wired up into the engine
-        assertTrue(implementedCount >= 40, "Expected at least 40 functions covered in core engine, got $implementedCount")
+        // Assert full 68/68 function parity across official codecs and controller
+        assertEquals(68, implementedCount, "Expected all 68 official functions covered in core engine and codecs")
     }
 
     enum class UiImplementationStatus {
@@ -331,14 +344,14 @@ class DecompiledUiAndFunctionCoverageTest {
             description = "Hardware version, Bluetooth MAC, SN, battery health [Android: full fragment]"
         ),
 
-        // Subsystems Currently Missing from Desktop UI
+        // Subsystems fully implemented as authentic MIUI desktop full views
         OfficialUiScreenSpec(
             name = "Spatial Audio & Head Tracking Studio",
             officialPackage = "com.mi.earphone.settings.ui.spatialaudio",
             officialClass = "PersonalAudioFragment",
             officialXmlLayout = "device_settings_activity_spatial_audio.xml",
-            desktopComponent = "NOT_CREATED",
-            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixSpatialAudioScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "3D surround rendering calibration with head orientation gyro visualization"
         ),
         OfficialUiScreenSpec(
@@ -346,8 +359,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.update",
             officialClass = "CheckUpdateFragment",
             officialXmlLayout = "device_settings_fragment_check_update.xml",
-            desktopComponent = "NOT_CREATED",
-            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixFirmwareUpdateScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "OTA update checker, changelog viewer, and block transfer progress screen"
         ),
         OfficialUiScreenSpec(
@@ -355,8 +368,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.usb",
             officialClass = "DongleSettingsFragment",
             officialXmlLayout = "device_settings_fragment_usb.xml",
-            desktopComponent = "NOT_CREATED",
-            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixDongleSettingsScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Low-latency wireless dongle pairing and dedicated dongle touch mappings"
         ),
         OfficialUiScreenSpec(
@@ -364,8 +377,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.xiaoai",
             officialClass = "XiaoAiSettingsFragment",
             officialXmlLayout = "device_settings_fragment_xiao_ai_settings.xml",
-            desktopComponent = "NOT_CREATED",
-            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixXiaoAiScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Voice tone selection, hotword triggers, and continuous dialogue timeout"
         ),
         OfficialUiScreenSpec(
@@ -373,8 +386,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.lab",
             officialClass = "DeviceLaboratoryFragment",
             officialXmlLayout = "device_settings_fragment_laboratory.xml",
-            desktopComponent = "NOT_CREATED",
-            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixLaboratoryScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Experimental features, noise reduction lab, and developer telemetry"
         ),
         OfficialUiScreenSpec(
@@ -382,8 +395,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.skin",
             officialClass = "PersonalSkinFragment",
             officialXmlLayout = "device_settings_fragment_personal_skin.xml",
-            desktopComponent = "NOT_CREATED",
-            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixPersonalSkinScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Pop-up pairing animations, custom earbud colorway skins, and sound themes"
         ),
         OfficialUiScreenSpec(
@@ -391,8 +404,8 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.sport",
             officialClass = "SportSettingsFragment",
             officialXmlLayout = "device_settings_fragment_sport_settings.xml",
-            desktopComponent = "NOT_CREATED",
-            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixSportSettingsScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Bone conduction swim pool length presets and fitness workout reporting"
         ),
         OfficialUiScreenSpec(
@@ -400,9 +413,18 @@ class DecompiledUiAndFunctionCoverageTest {
             officialPackage = "com.mi.earphone.settings.ui.voicetranslation",
             officialClass = "AudioRecordListActivity",
             officialXmlLayout = "device_settings_record_list_activity.xml",
-            desktopComponent = "NOT_CREATED",
-            status = UiImplementationStatus.NOT_IMPLEMENTED,
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixVoiceTranslationScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
             description = "Real-time speech-to-text recording, face-to-face translation, and audio export"
+        ),
+        OfficialUiScreenSpec(
+            name = "Welcome & Onboarding Guide Carousel",
+            officialPackage = "com.xiaomi.fitness.login.guide",
+            officialClass = "GuideActivity",
+            officialXmlLayout = "login_activity_guide.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixWelcomeGuideScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
+            description = "4-slide welcome presentation with official illustrations, skip, and feature highlights"
         )
     )
 
@@ -462,8 +484,8 @@ class DecompiledUiAndFunctionCoverageTest {
         }
         println("========================================================\n")
 
-        // Assert that we have at least verified all 25 screens exist and at least 15 have some UI presence
-        assertEquals(25, officialUiScreens.size)
-        assertTrue(fullViews + dialogApproximations >= 15)
+        // Assert that we have at least verified all 26 screens exist and 100% full view
+        assertEquals(26, officialUiScreens.size)
+        assertEquals(26, fullViews)
     }
 }
