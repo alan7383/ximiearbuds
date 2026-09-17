@@ -1,6 +1,9 @@
 package com.alan.ximiearbuds.core.catalog
 
 import com.alan.ximiearbuds.core.device.AncCapabilities
+import com.alan.ximiearbuds.core.device.GestureCapabilities
+import com.alan.ximiearbuds.core.device.SoundCapabilities
+import com.alan.ximiearbuds.core.device.MoreSettingsCapabilities
 import com.alan.ximiearbuds.core.device.EarbudsModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -297,17 +300,43 @@ object XiaomiCatalogService {
 
         val funcList = p["func_list"]?.jsonArray ?: JsonArray(emptyList())
         val funcIds = HashSet<Int>()
+        val groupIds = HashSet<Int>()
+        val extraDataMap = HashMap<Int, String>()
+
         for (f in funcList) {
-            val fid = (f as? JsonObject)?.get("func_id")?.jsonPrimitive?.intOrNull
-            if (fid != null) funcIds.add(fid)
+            val fObj = f as? JsonObject ?: continue
+            val fid = fObj["func_id"]?.jsonPrimitive?.intOrNull ?: continue
+            val gid = fObj["group_id"]?.jsonPrimitive?.intOrNull ?: 0
+            val extraEl = fObj["extra_data"]
+            val extraStr = when (extraEl) {
+                is JsonObject -> extraEl.toString()
+                is JsonPrimitive -> extraEl.content
+                else -> ""
+            }
+            funcIds.add(fid)
+            if (gid > 0) groupIds.add(gid)
+            extraDataMap[fid] = extraStr
+        }
+
+        for (fid in funcIds) {
+            when (fid) {
+                in 1001..1009 -> groupIds.add(1)
+                in 2001..2021 -> groupIds.add(2)
+                in 3001..3015 -> groupIds.add(3)
+                in 4001..4018 -> groupIds.add(4)
+                in 5001..5009 -> groupIds.add(5)
+                in 6001..6002 -> groupIds.add(6)
+                in 7001..7005 -> groupIds.add(7)
+                8001 -> groupIds.add(8)
+            }
         }
 
         val hasAnc = funcIds.any { it in listOf(1001, 1002, 1003, 1006, 1007, 1008, 1009) }
         val hasTransparency = funcIds.any { it in listOf(1004, 1005) }
         val hasEq = funcIds.any { it in listOf(2006, 2008, 2009, 2016) }
-        val hasGestures = funcIds.any { it in listOf(4001, 4002, 4003, 4004, 4005, 4006, 4011, 4012, 4013, 4014, 4018) }
+        val hasGestures = funcIds.any { it in 4001..4018 }
         val hasSlideGesture = 4011 in funcIds
-        val hasLowLatency = funcIds.any { it in listOf(3008, 3009, 3011) }
+        val hasLowLatency = (3011 in funcIds) || (3009 in funcIds) || (3008 in funcIds)
         val hasMultipoint = 3004 in funcIds
         val hasInEar = 3002 in funcIds
         val hasSpatial = funcIds.any { it in listOf(2001, 2002, 2004, 2005, 2018) }
@@ -346,27 +375,135 @@ object XiaomiCatalogService {
         val hasSmartDenoise = 1008 in funcIds
         val hasPersonalizedAnc = 3012 in funcIds
         val isSingleToggle = isBone || !hasTransparency
-        val ancLevels = when {
-            1006 in funcIds -> listOf(1, 0, 2, 4)
-            1007 in funcIds -> listOf(1, 0)
-            else -> listOf(1, 0, 2)
+        var ancLevels = listOf(1, 0, 2)
+        var transLevels = if (hasTransparency) listOf(0, 1, 2) else emptyList()
+        var hasAdaptiveAnc = false
+
+        for (fid in listOf(1002, 1003, 1006, 1007)) {
+            val exStr = extraDataMap[fid]
+            if (!exStr.isNullOrBlank()) {
+                try {
+                    val exObj = jsonParser.parseToJsonElement(exStr).jsonObject
+                    exObj["tws_gear"]?.jsonArray?.mapNotNull { it.jsonPrimitive.intOrNull }?.let {
+                        if (it.isNotEmpty()) ancLevels = it
+                    }
+                    if (exObj["auto_fit"]?.jsonPrimitive?.intOrNull == 1) {
+                        hasAdaptiveAnc = true
+                    }
+                } catch (_: Exception) {}
+            }
         }
-        val transparencyLevels = when {
-            !hasTransparency -> emptyList()
-            1004 in funcIds -> listOf(0, 1)
-            else -> listOf(0, 1, 2)
+        if (!hasAdaptiveAnc && hasAnc && codename in listOf("O76", "N76", "P76", "M75", "N75", "L71", "L76", "L77", "K73")) {
+            hasAdaptiveAnc = true
         }
-        val hasAdaptiveAnc = hasAnc && (
-            codename in listOf("O76", "N76", "P76", "M75", "N75", "L71", "L76", "L77", "K73") ||
-            1002 in funcIds || 1003 in funcIds
-        )
+
+        for (fid in listOf(1004, 1005)) {
+            val exStr = extraDataMap[fid]
+            if (!exStr.isNullOrBlank()) {
+                try {
+                    val exObj = jsonParser.parseToJsonElement(exStr).jsonObject
+                    exObj["tws_gear"]?.jsonArray?.mapNotNull { it.jsonPrimitive.intOrNull }?.let {
+                        if (it.isNotEmpty()) transLevels = it
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
         val ancCaps = AncCapabilities(
             hasAdaptiveAnc = hasAdaptiveAnc,
             hasPersonalizedAnc = hasPersonalizedAnc,
             hasSmartDenoise = hasSmartDenoise,
             ancLevels = ancLevels,
-            transparencyLevels = transparencyLevels,
+            transparencyLevels = transLevels,
             isSingleToggleOnly = isSingleToggle
+        )
+
+        // Parse gestures
+        val allowedActions = HashMap<Int, List<Int>>()
+        var noiseControlActions = listOf(1, 2, 3)
+        var hasSecondary = false
+        for (fid in 4001..4018) {
+            val exStr = extraDataMap[fid]
+            if (!exStr.isNullOrBlank()) {
+                try {
+                    val exObj = jsonParser.parseToJsonElement(exStr).jsonObject
+                    exObj["click_action"]?.jsonArray?.mapNotNull { it.jsonPrimitive.intOrNull }?.let {
+                        allowedActions[fid] = it
+                    }
+                    exObj["noise_ctrl"]?.jsonArray?.mapNotNull { it.jsonPrimitive.intOrNull }?.let {
+                        noiseControlActions = it
+                    }
+                    exObj["hasSecondaryPage"]?.jsonPrimitive?.booleanOrNull?.let {
+                        hasSecondary = it
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        val isPinch = funcIds.any { it in listOf(4004, 4005, 4006, 4012, 4013, 4014) }
+        val isMfb = 4018 in funcIds || isBone
+        val gestureCaps = GestureCapabilities(
+            allowedActions = allowedActions,
+            noiseControlActions = noiseControlActions,
+            hasSecondaryPage = hasSecondary,
+            isPinchGesture = isPinch,
+            isSlideGesture = hasSlideGesture,
+            isMfbGesture = isMfb
+        )
+
+        // Parse Sound
+        var supportedPresets = emptyList<Int>()
+        for (fid in listOf(2006, 2016)) {
+            val exStr = extraDataMap[fid]
+            if (!exStr.isNullOrBlank()) {
+                try {
+                    val exObj = jsonParser.parseToJsonElement(exStr).jsonObject
+                    exObj["sound_effect"]?.jsonObject?.get("effects")?.jsonArray?.mapNotNull { it.jsonPrimitive.intOrNull }?.let {
+                        if (it.isNotEmpty()) supportedPresets = it
+                    }
+                    if (supportedPresets.isEmpty()) {
+                        exObj["sound_list"]?.jsonArray?.mapNotNull { it.jsonPrimitive.intOrNull }?.let {
+                            if (it.isNotEmpty()) supportedPresets = it
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        var spatialScenes = emptyList<Int>()
+        extraDataMap[2009]?.let { exStr ->
+            if (exStr.isNotBlank()) {
+                try {
+                    val exObj = jsonParser.parseToJsonElement(exStr).jsonObject
+                    exObj["sound_render"]?.jsonObject?.get("scenes")?.jsonArray?.mapNotNull { it.jsonPrimitive.intOrNull }?.let {
+                        spatialScenes = it
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        val soundCaps = SoundCapabilities(
+            supportedPresets = supportedPresets,
+            hasVirtualSurround = 2001 in funcIds,
+            hasAdaptiveSense = 2008 in funcIds,
+            hasAudibilityAdaptation = 2019 in funcIds,
+            hasAdaptiveVolume = 2017 in funcIds,
+            hasNotificationVolume = 2021 in funcIds,
+            hasSpatialAudio = hasSpatial,
+            hasHeadTracking = 2004 in funcIds,
+            spatialScenes = spatialScenes
+        )
+
+        val moreSettingsCaps = MoreSettingsCapabilities(
+            hasWearDetection = hasInEar,
+            hasMultipoint = hasMultipoint,
+            hasLowLatency = hasLowLatency,
+            hasAutoPickCall = 3008 in funcIds,
+            hasFitDetection = hasFitDetection,
+            hasEarCanalDetection = 3013 in funcIds,
+            hasEarboxSound = hasEarboxSound,
+            hasVoiceControl = 3005 in funcIds,
+            hasCustomSkin = 3010 in funcIds,
+            hasDongle = hasDongle,
+            hasSport = isBone || (8 in groupIds) || (8001 in funcIds),
+            hasFindDevice = 5001 in funcIds || true
         )
 
         return EarbudsModel(
@@ -381,6 +518,13 @@ object XiaomiCatalogService {
             iconUrl = primaryIconUrl,
             colorVariants = colorVariants,
             defaultColor = defaultColor,
+            supportedFunctionIds = funcIds,
+            functionGroups = groupIds,
+            functionExtraData = extraDataMap,
+            ancCapabilities = ancCaps,
+            gestureCapabilities = gestureCaps,
+            soundCapabilities = soundCaps,
+            moreSettingsCapabilities = moreSettingsCaps,
             hasAnc = hasAnc,
             hasTransparency = hasTransparency,
             has10BandEq = hasEq,
@@ -394,8 +538,7 @@ object XiaomiCatalogService {
             hasEarboxSound = hasEarboxSound,
             hasFindDevice = true,
             hasDongle = hasDongle,
-            isBoneConduction = isBone,
-            ancCapabilities = ancCaps
+            isBoneConduction = isBone
         )
     }
 
@@ -423,6 +566,50 @@ object XiaomiCatalogService {
             val hasTransparency = obj["hasTransparency"]?.jsonPrimitive?.booleanOrNull ?: true
             val isBone = obj["isBoneConduction"]?.jsonPrimitive?.booleanOrNull ?: false
 
+            // Parse func_list
+            val funcList = obj["func_list"]?.jsonArray ?: JsonArray(emptyList())
+            val funcIds = HashSet<Int>()
+            val groupIds = HashSet<Int>()
+            val extraDataMap = HashMap<Int, String>()
+
+            for (f in funcList) {
+                val fObj = f as? JsonObject ?: continue
+                val fid = fObj["func_id"]?.jsonPrimitive?.intOrNull ?: continue
+                val gid = fObj["group_id"]?.jsonPrimitive?.intOrNull ?: 0
+                val ex = fObj["extra_data"]
+                val exStr = when (ex) {
+                    is JsonObject -> ex.toString()
+                    is JsonPrimitive -> ex.content
+                    else -> ""
+                }
+                funcIds.add(fid)
+                if (gid > 0) groupIds.add(gid)
+                extraDataMap[fid] = exStr
+            }
+
+            for (fid in funcIds) {
+                when (fid) {
+                    in 1001..1009 -> groupIds.add(1)
+                    in 2001..2021 -> groupIds.add(2)
+                    in 3001..3015 -> groupIds.add(3)
+                    in 4001..4018 -> groupIds.add(4)
+                    in 5001..5009 -> groupIds.add(5)
+                    in 6001..6002 -> groupIds.add(6)
+                    in 7001..7005 -> groupIds.add(7)
+                    8001 -> groupIds.add(8)
+                }
+            }
+
+            // Fallback groups if func_list was empty
+            if (groupIds.isEmpty()) {
+                if (hasAnc || hasTransparency) groupIds.add(1)
+                groupIds.add(2)
+                groupIds.add(3)
+                if (obj["hasGestures"]?.jsonPrimitive?.booleanOrNull != false) groupIds.add(4)
+                groupIds.add(5)
+            }
+
+            // ANC Capabilities
             val ancCapsObj = obj["ancCapabilities"]?.jsonObject
             val ancCaps = if (ancCapsObj != null) {
                 AncCapabilities(
@@ -434,17 +621,87 @@ object XiaomiCatalogService {
                     isSingleToggleOnly = ancCapsObj["isSingleToggleOnly"]?.jsonPrimitive?.booleanOrNull ?: false
                 )
             } else {
-                val isSingle = isBone || !hasTransparency
-                val hasAdaptive = hasAnc && codename in listOf("O76", "N76", "P76", "M75", "N75", "L71", "L76", "L77", "K73")
-                val hasPersonal = hasAnc && codename in listOf("O76", "N76", "P76", "M75")
-                val hasSmart = hasAnc && codename in listOf("P76", "P79")
                 AncCapabilities(
-                    hasAdaptiveAnc = hasAdaptive,
-                    hasPersonalizedAnc = hasPersonal,
-                    hasSmartDenoise = hasSmart,
+                    hasAdaptiveAnc = hasAnc && codename in listOf("O76", "N76", "P76", "M75", "N75", "L71", "L76", "L77", "K73"),
+                    hasPersonalizedAnc = hasAnc && codename in listOf("O76", "N76", "P76", "M75"),
+                    hasSmartDenoise = hasAnc && codename in listOf("P76", "P79"),
                     ancLevels = if (codename in listOf("K75", "K73")) listOf(1, 0, 2, 4) else listOf(1, 0, 2),
                     transparencyLevels = if (!hasTransparency) emptyList() else if (codename in listOf("K75", "K73")) listOf(0, 1) else listOf(0, 1, 2),
-                    isSingleToggleOnly = isSingle
+                    isSingleToggleOnly = isBone || !hasTransparency
+                )
+            }
+
+            // Gesture Capabilities
+            val gestureCapsObj = obj["gestureCapabilities"]?.jsonObject
+            val gestureCaps = if (gestureCapsObj != null) {
+                val allowed = HashMap<Int, List<Int>>()
+                gestureCapsObj["allowedActions"]?.jsonObject?.forEach { (k, v) ->
+                    k.toIntOrNull()?.let { fid ->
+                        allowed[fid] = v.jsonArray.mapNotNull { it.jsonPrimitive.intOrNull }
+                    }
+                }
+                GestureCapabilities(
+                    allowedActions = allowed,
+                    noiseControlActions = gestureCapsObj["noiseControlActions"]?.jsonArray?.mapNotNull { it.jsonPrimitive.intOrNull } ?: listOf(1, 2, 3),
+                    hasSecondaryPage = gestureCapsObj["hasSecondaryPage"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    isPinchGesture = gestureCapsObj["isPinchGesture"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    isSlideGesture = gestureCapsObj["isSlideGesture"]?.jsonPrimitive?.booleanOrNull ?: (obj["hasSlideGesture"]?.jsonPrimitive?.booleanOrNull ?: false),
+                    isMfbGesture = gestureCapsObj["isMfbGesture"]?.jsonPrimitive?.booleanOrNull ?: isBone
+                )
+            } else {
+                GestureCapabilities(
+                    isSlideGesture = obj["hasSlideGesture"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    isMfbGesture = isBone
+                )
+            }
+
+            // Sound Capabilities
+            val soundCapsObj = obj["soundCapabilities"]?.jsonObject
+            val soundCaps = if (soundCapsObj != null) {
+                SoundCapabilities(
+                    supportedPresets = soundCapsObj["supportedPresets"]?.jsonArray?.mapNotNull { it.jsonPrimitive.intOrNull } ?: emptyList(),
+                    hasVirtualSurround = soundCapsObj["hasVirtualSurround"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasAdaptiveSense = soundCapsObj["hasAdaptiveSense"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasAudibilityAdaptation = soundCapsObj["hasAudibilityAdaptation"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasAdaptiveVolume = soundCapsObj["hasAdaptiveVolume"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasNotificationVolume = soundCapsObj["hasNotificationVolume"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasSpatialAudio = soundCapsObj["hasSpatialAudio"]?.jsonPrimitive?.booleanOrNull ?: (obj["hasSpatialAudio"]?.jsonPrimitive?.booleanOrNull ?: false),
+                    hasHeadTracking = soundCapsObj["hasHeadTracking"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    spatialScenes = soundCapsObj["spatialScenes"]?.jsonArray?.mapNotNull { it.jsonPrimitive.intOrNull } ?: emptyList()
+                )
+            } else {
+                SoundCapabilities(
+                    hasSpatialAudio = obj["hasSpatialAudio"]?.jsonPrimitive?.booleanOrNull ?: false
+                )
+            }
+
+            // More Settings Capabilities
+            val moreCapsObj = obj["moreSettingsCapabilities"]?.jsonObject
+            val moreCaps = if (moreCapsObj != null) {
+                MoreSettingsCapabilities(
+                    hasWearDetection = moreCapsObj["hasWearDetection"]?.jsonPrimitive?.booleanOrNull ?: (obj["hasInEarDetection"]?.jsonPrimitive?.booleanOrNull ?: true),
+                    hasMultipoint = moreCapsObj["hasMultipoint"]?.jsonPrimitive?.booleanOrNull ?: (obj["hasMultipoint"]?.jsonPrimitive?.booleanOrNull ?: true),
+                    hasLowLatency = moreCapsObj["hasLowLatency"]?.jsonPrimitive?.booleanOrNull ?: (obj["hasLowLatency"]?.jsonPrimitive?.booleanOrNull ?: true),
+                    hasAutoPickCall = moreCapsObj["hasAutoPickCall"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasFitDetection = moreCapsObj["hasFitDetection"]?.jsonPrimitive?.booleanOrNull ?: (obj["hasFitDetection"]?.jsonPrimitive?.booleanOrNull ?: false),
+                    hasEarCanalDetection = moreCapsObj["hasEarCanalDetection"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasEarboxSound = moreCapsObj["hasEarboxSound"]?.jsonPrimitive?.booleanOrNull ?: (obj["hasEarboxSound"]?.jsonPrimitive?.booleanOrNull ?: false),
+                    hasVoiceControl = moreCapsObj["hasVoiceControl"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasCustomSkin = moreCapsObj["hasCustomSkin"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasDongle = moreCapsObj["hasDongle"]?.jsonPrimitive?.booleanOrNull ?: (obj["hasDongle"]?.jsonPrimitive?.booleanOrNull ?: false),
+                    hasSport = moreCapsObj["hasSport"]?.jsonPrimitive?.booleanOrNull ?: isBone,
+                    hasFindDevice = moreCapsObj["hasFindDevice"]?.jsonPrimitive?.booleanOrNull ?: true
+                )
+            } else {
+                MoreSettingsCapabilities(
+                    hasWearDetection = obj["hasInEarDetection"]?.jsonPrimitive?.booleanOrNull ?: true,
+                    hasMultipoint = obj["hasMultipoint"]?.jsonPrimitive?.booleanOrNull ?: true,
+                    hasLowLatency = obj["hasLowLatency"]?.jsonPrimitive?.booleanOrNull ?: true,
+                    hasFitDetection = obj["hasFitDetection"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasEarboxSound = obj["hasEarboxSound"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasDongle = obj["hasDongle"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    hasSport = isBone,
+                    hasFindDevice = true
                 )
             }
 
@@ -461,6 +718,13 @@ object XiaomiCatalogService {
                     iconUrl = iconUrl,
                     colorVariants = colorVariants,
                     defaultColor = defaultColor,
+                    supportedFunctionIds = funcIds,
+                    functionGroups = groupIds,
+                    functionExtraData = extraDataMap,
+                    ancCapabilities = ancCaps,
+                    gestureCapabilities = gestureCaps,
+                    soundCapabilities = soundCaps,
+                    moreSettingsCapabilities = moreCaps,
                     hasAnc = hasAnc,
                     hasTransparency = hasTransparency,
                     has10BandEq = obj["has10BandEq"]?.jsonPrimitive?.booleanOrNull ?: true,
@@ -474,8 +738,7 @@ object XiaomiCatalogService {
                     hasEarboxSound = obj["hasEarboxSound"]?.jsonPrimitive?.booleanOrNull ?: false,
                     hasFindDevice = obj["hasFindDevice"]?.jsonPrimitive?.booleanOrNull ?: true,
                     hasDongle = obj["hasDongle"]?.jsonPrimitive?.booleanOrNull ?: false,
-                    isBoneConduction = isBone,
-                    ancCapabilities = ancCaps
+                    isBoneConduction = isBone
                 )
             )
         }
@@ -500,6 +763,26 @@ object XiaomiCatalogService {
                         m.colorVariants.forEach { (k, v) -> put(k, v) }
                     })
                     put("defaultColor", m.defaultColor)
+                    put("func_list", buildJsonArray {
+                        for (fid in m.supportedFunctionIds) {
+                            add(buildJsonObject {
+                                put("func_id", fid)
+                                val gid = when (fid) {
+                                    in 1001..1009 -> 1
+                                    in 2001..2021 -> 2
+                                    in 3001..3015 -> 3
+                                    in 4001..4018 -> 4
+                                    in 5001..5009 -> 5
+                                    in 6001..6002 -> 6
+                                    in 7001..7005 -> 7
+                                    8001 -> 8
+                                    else -> 0
+                                }
+                                put("group_id", gid)
+                                put("extra_data", m.getExtraData(fid) ?: "")
+                            })
+                        }
+                    })
                     put("hasAnc", m.hasAnc)
                     put("hasTransparency", m.hasTransparency)
                     put("has10BandEq", m.has10BandEq)
@@ -521,6 +804,43 @@ object XiaomiCatalogService {
                         put("ancLevels", buildJsonArray { m.ancCapabilities.ancLevels.forEach { add(it) } })
                         put("transparencyLevels", buildJsonArray { m.ancCapabilities.transparencyLevels.forEach { add(it) } })
                         put("isSingleToggleOnly", m.ancCapabilities.isSingleToggleOnly)
+                    })
+                    put("gestureCapabilities", buildJsonObject {
+                        put("allowedActions", buildJsonObject {
+                            m.gestureCapabilities.allowedActions.forEach { (fid, acts) ->
+                                put(fid.toString(), buildJsonArray { acts.forEach { add(it) } })
+                            }
+                        })
+                        put("noiseControlActions", buildJsonArray { m.gestureCapabilities.noiseControlActions.forEach { add(it) } })
+                        put("hasSecondaryPage", m.gestureCapabilities.hasSecondaryPage)
+                        put("isPinchGesture", m.gestureCapabilities.isPinchGesture)
+                        put("isSlideGesture", m.gestureCapabilities.isSlideGesture)
+                        put("isMfbGesture", m.gestureCapabilities.isMfbGesture)
+                    })
+                    put("soundCapabilities", buildJsonObject {
+                        put("supportedPresets", buildJsonArray { m.soundCapabilities.supportedPresets.forEach { add(it) } })
+                        put("hasVirtualSurround", m.soundCapabilities.hasVirtualSurround)
+                        put("hasAdaptiveSense", m.soundCapabilities.hasAdaptiveSense)
+                        put("hasAudibilityAdaptation", m.soundCapabilities.hasAudibilityAdaptation)
+                        put("hasAdaptiveVolume", m.soundCapabilities.hasAdaptiveVolume)
+                        put("hasNotificationVolume", m.soundCapabilities.hasNotificationVolume)
+                        put("hasSpatialAudio", m.soundCapabilities.hasSpatialAudio)
+                        put("hasHeadTracking", m.soundCapabilities.hasHeadTracking)
+                        put("spatialScenes", buildJsonArray { m.soundCapabilities.spatialScenes.forEach { add(it) } })
+                    })
+                    put("moreSettingsCapabilities", buildJsonObject {
+                        put("hasWearDetection", m.moreSettingsCapabilities.hasWearDetection)
+                        put("hasMultipoint", m.moreSettingsCapabilities.hasMultipoint)
+                        put("hasLowLatency", m.moreSettingsCapabilities.hasLowLatency)
+                        put("hasAutoPickCall", m.moreSettingsCapabilities.hasAutoPickCall)
+                        put("hasFitDetection", m.moreSettingsCapabilities.hasFitDetection)
+                        put("hasEarCanalDetection", m.moreSettingsCapabilities.hasEarCanalDetection)
+                        put("hasEarboxSound", m.moreSettingsCapabilities.hasEarboxSound)
+                        put("hasVoiceControl", m.moreSettingsCapabilities.hasVoiceControl)
+                        put("hasCustomSkin", m.moreSettingsCapabilities.hasCustomSkin)
+                        put("hasDongle", m.moreSettingsCapabilities.hasDongle)
+                        put("hasSport", m.moreSettingsCapabilities.hasSport)
+                        put("hasFindDevice", m.moreSettingsCapabilities.hasFindDevice)
                     })
                 })
             }

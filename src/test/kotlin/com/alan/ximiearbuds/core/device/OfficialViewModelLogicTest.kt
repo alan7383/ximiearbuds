@@ -75,7 +75,7 @@ class OfficialViewModelLogicTest {
         assertTrue(buds6pro.ancCapabilities.hasAdaptiveAnc, "Redmi Buds 6 Pro must have Adaptive ANC")
         assertTrue(buds6pro.ancCapabilities.hasPersonalizedAnc, "Redmi Buds 6 Pro must have Personalized ANC")
         assertFalse(buds6pro.ancCapabilities.hasSmartDenoise, "Redmi Buds 6 Pro does not have Smart Wind Denoise")
-        assertEquals(listOf(1, 0, 2), buds6pro.ancCapabilities.ancLevels)
+        assertEquals((0..19).toList(), buds6pro.ancCapabilities.ancLevels)
         assertEquals(listOf(0, 1, 2), buds6pro.ancCapabilities.transparencyLevels)
         assertFalse(buds6pro.ancCapabilities.isSingleToggleOnly)
 

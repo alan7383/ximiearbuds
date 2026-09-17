@@ -173,14 +173,13 @@ class WindowsBthTransport(
                         streamAccumulator.add(buffer[i])
                     }
 
-                    val parsedPackets = RcspPacket.parseStream(streamAccumulator.toByteArray())
+                    val (parsedPackets, consumed) = RcspPacket.parseStreamWithConsumed(streamAccumulator.toByteArray())
                     if (parsedPackets.isNotEmpty()) {
                         for (pkt in parsedPackets) {
                             _incomingPackets.emit(pkt)
                         }
-                        val lastEndIdx = streamAccumulator.lastIndexOf(RcspPacket.END_BYTE)
-                        if (lastEndIdx >= 0 && lastEndIdx + 1 <= streamAccumulator.size) {
-                            val remaining = streamAccumulator.subList(lastEndIdx + 1, streamAccumulator.size).toList()
+                        if (consumed > 0 && consumed <= streamAccumulator.size) {
+                            val remaining = streamAccumulator.subList(consumed, streamAccumulator.size).toList()
                             streamAccumulator.clear()
                             streamAccumulator.addAll(remaining)
                         }

@@ -14,6 +14,42 @@ data class AncCapabilities(
     val isSingleToggleOnly: Boolean = false
 )
 
+data class GestureCapabilities(
+    val allowedActions: Map<Int, List<Int>> = emptyMap(),
+    val noiseControlActions: List<Int> = listOf(1, 2, 3),
+    val hasSecondaryPage: Boolean = false,
+    val isPinchGesture: Boolean = false,
+    val isSlideGesture: Boolean = false,
+    val isMfbGesture: Boolean = false
+)
+
+data class SoundCapabilities(
+    val supportedPresets: List<Int> = emptyList(),
+    val hasVirtualSurround: Boolean = false,
+    val hasAdaptiveSense: Boolean = false,
+    val hasAudibilityAdaptation: Boolean = false,
+    val hasAdaptiveVolume: Boolean = false,
+    val hasNotificationVolume: Boolean = false,
+    val hasSpatialAudio: Boolean = false,
+    val hasHeadTracking: Boolean = false,
+    val spatialScenes: List<Int> = emptyList()
+)
+
+data class MoreSettingsCapabilities(
+    val hasWearDetection: Boolean = true,
+    val hasMultipoint: Boolean = true,
+    val hasLowLatency: Boolean = true,
+    val hasAutoPickCall: Boolean = false,
+    val hasFitDetection: Boolean = false,
+    val hasEarCanalDetection: Boolean = false,
+    val hasEarboxSound: Boolean = false,
+    val hasVoiceControl: Boolean = false,
+    val hasCustomSkin: Boolean = false,
+    val hasDongle: Boolean = false,
+    val hasSport: Boolean = false,
+    val hasFindDevice: Boolean = true
+)
+
 data class EarbudsModel(
     val codename: String,
     val commercialName: String,
@@ -26,6 +62,15 @@ data class EarbudsModel(
     val iconUrl: String = "",
     val colorVariants: Map<String, String> = emptyMap(),
     val defaultColor: Int = 1,
+    // Capabilities:
+    val supportedFunctionIds: Set<Int> = emptySet(),
+    val functionGroups: Set<Int> = emptySet(),
+    val functionExtraData: Map<Int, String> = emptyMap(),
+    val ancCapabilities: AncCapabilities = AncCapabilities(),
+    val gestureCapabilities: GestureCapabilities = GestureCapabilities(),
+    val soundCapabilities: SoundCapabilities = SoundCapabilities(),
+    val moreSettingsCapabilities: MoreSettingsCapabilities = MoreSettingsCapabilities(),
+    // Legacy flags kept for backwards compatibility:
     val hasAnc: Boolean = true,
     val hasTransparency: Boolean = true,
     val has10BandEq: Boolean = true,
@@ -39,9 +84,12 @@ data class EarbudsModel(
     val hasEarboxSound: Boolean = false,
     val hasFindDevice: Boolean = true,
     val hasDongle: Boolean = false,
-    val isBoneConduction: Boolean = false,
-    val ancCapabilities: AncCapabilities = AncCapabilities()
-)
+    val isBoneConduction: Boolean = false
+) {
+    fun hasFunction(funcId: Int): Boolean = supportedFunctionIds.contains(funcId)
+    fun hasGroup(groupId: Int): Boolean = functionGroups.contains(groupId)
+    fun getExtraData(funcId: Int): String? = functionExtraData[funcId]
+}
 
 object DeviceRegistry {
     val GENERIC_MODEL = EarbudsModel(
@@ -50,6 +98,14 @@ object DeviceRegistry {
         vendorId = 10007,
         productIds = emptyList(),
         brand = "Xiaomi",
+        supportedFunctionIds = setOf(
+            1001, 1002, 1005, 1008,
+            2001, 2002, 2004, 2006, 2008, 2009, 2016, 2017, 2019, 2021,
+            3002, 3003, 3004, 3005, 3008, 3010, 3011, 3012, 3013, 3015,
+            4001, 4002, 4003, 4006, 4011,
+            5001, 5002, 5004, 5005
+        ),
+        functionGroups = setOf(1, 2, 3, 4, 5),
         hasAnc = true,
         hasTransparency = true,
         has10BandEq = true,
@@ -61,7 +117,40 @@ object DeviceRegistry {
         hasSpatialAudio = true,
         hasFitDetection = true,
         hasEarboxSound = true,
-        hasFindDevice = true
+        hasFindDevice = true,
+        ancCapabilities = AncCapabilities(
+            hasAdaptiveAnc = true,
+            hasPersonalizedAnc = true,
+            hasSmartDenoise = true,
+            ancLevels = listOf(1, 0, 2),
+            transparencyLevels = listOf(0, 1, 2),
+            isSingleToggleOnly = false
+        ),
+        soundCapabilities = SoundCapabilities(
+            supportedPresets = listOf(0, 1, 5, 6, 10),
+            hasVirtualSurround = true,
+            hasAdaptiveSense = true,
+            hasAudibilityAdaptation = true,
+            hasAdaptiveVolume = true,
+            hasNotificationVolume = true,
+            hasSpatialAudio = true,
+            hasHeadTracking = true,
+            spatialScenes = listOf(1, 2, 3, 4, 5)
+        ),
+        moreSettingsCapabilities = MoreSettingsCapabilities(
+            hasWearDetection = true,
+            hasMultipoint = true,
+            hasLowLatency = true,
+            hasAutoPickCall = true,
+            hasFitDetection = true,
+            hasEarCanalDetection = true,
+            hasEarboxSound = true,
+            hasVoiceControl = true,
+            hasCustomSkin = true,
+            hasDongle = false,
+            hasSport = false,
+            hasFindDevice = true
+        )
     )
 
     private val _modelsFlow = MutableStateFlow<List<EarbudsModel>>(emptyList())

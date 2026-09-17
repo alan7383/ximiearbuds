@@ -59,41 +59,14 @@ fun XiaomiHeroBanner(
             )
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Device Title
+        // Connection State (connect_state_tv from device_settings_item_main_device_info.xml)
         Text(
-            text = deviceName,
-            color = XiaomiTextPrimary,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.2.sp
+            text = if (isConnected) stringRes("device_settings_device_connected") else stringRes("device_settings_device_disconnected"),
+            color = if (isConnected) XiaomiBlue else XiaomiTextSecondary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Normal,
+            modifier = Modifier.padding(top = 6.dp, bottom = 12.dp)
         )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Connection Status Badge (MIUI style)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(vertical = 2.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .clip(CircleShape)
-                    .background(if (isConnected) XiaomiGreen else XiaomiRed)
-            )
-
-            Spacer(modifier = Modifier.width(6.dp))
-
-            Text(
-                text = if (isConnected) stringRes("device_connected") else stringRes("device_disconnected"),
-                color = if (isConnected) XiaomiBlue else XiaomiTextMuted,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Normal
-            )
-        }
 
         // Color Swatches (if multiple official color variants exist for this model)
         if (model != null && model.colorVariants.size > 1) {

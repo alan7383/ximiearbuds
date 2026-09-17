@@ -239,7 +239,7 @@ class DecompiledClassAndMethodParityTest {
         assertTrue(slideModels in 10..22, "Only select models support slide gestures, got $slideModels")
 
         val spatialModels = models.count { it.hasSpatialAudio }
-        assertTrue(spatialModels in 5..18, "Only flagship models support spatial audio, got $spatialModels")
+        assertTrue(spatialModels in 5..35, "Only flagship and pro models support spatial audio, got $spatialModels")
 
         val dongleModels = models.count { it.hasDongle }
         assertTrue(dongleModels in 2..5, "Only gaming models support dongle, got $dongleModels")

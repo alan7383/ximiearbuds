@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -14,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -25,6 +27,8 @@ import com.alan.ximiearbuds.core.device.DevicePreferences
 import com.alan.ximiearbuds.core.device.DeviceRegistry
 import com.alan.ximiearbuds.core.device.EarbudsController
 import com.alan.ximiearbuds.core.device.EarbudsModel
+import com.alan.ximiearbuds.core.protocol.OfficialGroupIds
+import com.alan.ximiearbuds.core.protocol.OfficialFunctionIds
 import com.alan.ximiearbuds.ui.components.*
 import com.alan.ximiearbuds.ui.navigation.ScreenDestination
 import com.alan.ximiearbuds.ui.screens.*
@@ -224,65 +228,72 @@ fun MainWindow(
                         // -------------------------------------------------------------------------
                         when (currentDestination) {
                             ScreenDestination.MainSettings -> {
-                                // Authentic MIUI Top Action Bar (device_settings_fragment_device_settings.xml)
+                                // Authentic Action Bar Header (device_settings_layout_setting_header.xml)
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(56.dp)
                                         .background(XiaomiCardBg)
-                                        .padding(horizontal = 16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Left: Switch / Back to Device List
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        // device_name_tv: 24sp, FontNormal
+                                        Text(
+                                            text = activeDeviceName,
+                                            color = XiaomiTextPrimary,
+                                            fontSize = 24.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        // show_all_device_tv: 14sp, FontRegular, text_color_70, drawableEnd device_settings_drawable_end_all_devices
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.clickable { currentScreen = AppScreen.ADD_DEVICE }
+                                        ) {
+                                            Text(
+                                                text = stringRes("device_settings_show_all_device"),
+                                                color = XiaomiTextSecondary,
+                                                fontSize = 14.sp
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Image(
+                                                painter = painterResource("drawable/device_settings_drawable_end_all_devices.png"),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(10.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // add_device_iv: @drawable/device_setting_add_device
                                     IconButton(
                                         onClick = { currentScreen = AppScreen.ADD_DEVICE },
                                         modifier = Modifier.size(36.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                            contentDescription = "Back",
-                                            tint = XiaomiTextPrimary,
-                                            modifier = Modifier.size(22.dp)
+                                        Image(
+                                            painter = painterResource("drawable/device_setting_add_device.webp"),
+                                            contentDescription = stringRes("device_add_title"),
+                                            modifier = Modifier.size(24.dp)
                                         )
                                     }
 
-                                    // Center: Device Title
-                                    Text(
-                                        text = activeDeviceName,
-                                        color = XiaomiTextPrimary,
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
-                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
 
-                                    // Right: Add (+) & More Settings (...)
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        IconButton(
-                                            onClick = { currentScreen = AppScreen.ADD_DEVICE },
-                                            modifier = Modifier.size(36.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Add,
-                                                contentDescription = stringRes("device_add_title"),
-                                                tint = XiaomiTextPrimary,
-                                                modifier = Modifier.size(22.dp)
-                                            )
-                                        }
-
-                                        IconButton(
-                                            onClick = { navStack.add(ScreenDestination.MoreSettings) },
-                                            modifier = Modifier.size(36.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.MoreVert,
-                                                contentDescription = stringRes("device_settings_more_settings"),
-                                                tint = XiaomiTextPrimary,
-                                                modifier = Modifier.size(22.dp)
-                                            )
-                                        }
+                                    // user_avatar_iv: @drawable/avatar_default, 22dp circle
+                                    IconButton(
+                                        onClick = { showLangMenu = true },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Image(
+                                            painter = painterResource("drawable/avatar_default.png"),
+                                            contentDescription = "Avatar",
+                                            modifier = Modifier
+                                                .size(22.dp)
+                                                .clip(CircleShape)
+                                        )
                                     }
                                 }
 
@@ -310,9 +321,10 @@ fun MainWindow(
                                     )
 
                                     // 3. Authentic Noise Reduction Card 1:1 (device_settings_layout_noise_redution.xml)
-                                    if (currentModel.hasAnc || currentModel.hasTransparency) {
+                                    if (currentModel.hasGroup(OfficialGroupIds.GROUP_NOISE) || currentModel.hasAnc || currentModel.hasTransparency) {
                                         MiuixNoiseReductionView(
                                             noiseState = noiseControl,
+                                            capabilities = currentModel.ancCapabilities,
                                             onModeChange = { controller.setNoiseMode(it) },
                                             onAncLevelChange = { controller.setAncLevel(it) },
                                             onTransparencyLevelChange = { controller.setTransparencyLevel(it) },
@@ -323,8 +335,8 @@ fun MainWindow(
 
                                     // 4. Function Group 1: Audio & Controls (function_layout1)
                                     XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
-                                        // Audio Recording / Transcription (function_record)
-                                        if (currentModel.codename.contains("N75", ignoreCase = true) || currentModel.codename.contains("O70C", ignoreCase = true)) {
+                                        // Audio Recording / Transcription (function_record - 5003)
+                                        if (currentModel.hasFunction(OfficialFunctionIds.FUNC_DEVICE_RECORD)) {
                                             XiaomiActionItem(
                                                 title = stringRes("device_settings_record_title"),
                                                 iconRes = "drawable/device_settings_audio_record.png",
@@ -333,8 +345,8 @@ fun MainWindow(
                                             XiaomiItemDivider()
                                         }
 
-                                        // Translation (function_translate)
-                                        if (currentModel.codename.contains("O71", ignoreCase = true) || currentModel.codename.contains("O74", ignoreCase = true) || currentModel.codename.contains("O70C", ignoreCase = true)) {
+                                        // Translation (function_translate - 5008)
+                                        if (currentModel.hasFunction(OfficialFunctionIds.FUNC_DEVICE_TRANSLATE)) {
                                             XiaomiActionItem(
                                                 title = stringRes("device_settings_translate_title"),
                                                 iconRes = "drawable/device_settings_translate.png",
@@ -343,51 +355,61 @@ fun MainWindow(
                                             XiaomiItemDivider()
                                         }
 
-                                        // XiaoAI Voice Assistant (function_super_aivs)
-                                        XiaomiActionItem(
-                                            title = stringRes("device_settings_super_aivs"),
-                                            iconRes = "drawable/device_settings_aivs.png",
-                                            onClick = { navStack.add(ScreenDestination.XiaoAiSettings) }
-                                        )
-                                        XiaomiItemDivider()
+                                        // XiaoAI Voice Assistant (function_super_aivs - 5009 or voice control 3005)
+                                        if (currentModel.hasFunction(OfficialFunctionIds.SUPER_AI) || currentModel.moreSettingsCapabilities.hasVoiceControl) {
+                                            XiaomiActionItem(
+                                                title = stringRes("device_settings_super_aivs"),
+                                                iconRes = "drawable/device_settings_aivs.png",
+                                                onClick = { navStack.add(ScreenDestination.XiaoAiSettings) }
+                                            )
+                                            XiaomiItemDivider()
+                                        }
 
-                                        // Gesture operations (function_gesture) -> Opens full MiuixGestureScreen
-                                        XiaomiActionItem(
-                                            title = stringRes("device_settings_gesture_operation"),
-                                            iconRes = "drawable/device_settings_ic_gesture.webp",
-                                            onClick = { navStack.add(ScreenDestination.GestureControl) }
-                                        )
-                                        XiaomiItemDivider()
+                                        // Gesture operations (function_gesture - Group 4) -> Opens full MiuixGestureScreen
+                                        if (currentModel.hasGroup(OfficialGroupIds.GROUP_GESTURE_SETTING) || currentModel.hasGestures) {
+                                            XiaomiActionItem(
+                                                title = stringRes("device_settings_gesture_operation"),
+                                                iconRes = "drawable/device_settings_ic_gesture.webp",
+                                                onClick = { navStack.add(ScreenDestination.GestureControl) }
+                                            )
+                                            XiaomiItemDivider()
+                                        }
 
-                                        // Sound settings / EQ (function_sound) -> Opens full MiuixSoundEffectsScreen
-                                        XiaomiActionItem(
-                                            title = stringRes("device_settings_sound_settings"),
-                                            subtitle = stringRes(equalizer.preset.stringKey),
-                                            iconRes = "drawable/device_settings_ic_sound_settings.webp",
-                                            onClick = { navStack.add(ScreenDestination.SoundEffects) }
-                                        )
-                                        XiaomiItemDivider()
+                                        // Sound settings / EQ (function_sound - Group 2) -> Opens full MiuixSoundEffectsScreen
+                                        if (currentModel.hasGroup(OfficialGroupIds.GROUP_VOICE) || currentModel.has10BandEq) {
+                                            XiaomiActionItem(
+                                                title = stringRes("device_settings_sound_settings"),
+                                                subtitle = stringRes(equalizer.preset.stringKey),
+                                                iconRes = "drawable/device_settings_ic_sound_settings.webp",
+                                                onClick = { navStack.add(ScreenDestination.SoundEffects) }
+                                            )
+                                            XiaomiItemDivider()
+                                        }
 
-                                        // Laboratory / Fit detection -> Opens full MiuixLaboratoryScreen
-                                        XiaomiActionItem(
-                                            title = stringRes("device_settings_laboratory_function_title"),
-                                            iconRes = "drawable/device_settings_laboratory_function.png",
-                                            onClick = { navStack.add(ScreenDestination.Laboratory) }
-                                        )
-                                        XiaomiItemDivider()
+                                        // Laboratory (function_laboratory - Group 6) -> Opens full MiuixLaboratoryScreen
+                                        if (currentModel.hasGroup(OfficialGroupIds.GROUP_LABORATORY) || currentModel.hasFitDetection) {
+                                            XiaomiActionItem(
+                                                title = stringRes("device_settings_laboratory_function_title"),
+                                                iconRes = "drawable/device_settings_laboratory_function.png",
+                                                onClick = { navStack.add(ScreenDestination.Laboratory) }
+                                            )
+                                            XiaomiItemDivider()
+                                        }
 
-                                        // More Settings (function_more_setting) -> Opens full MiuixMoreSettingsScreen
-                                        XiaomiActionItem(
-                                            title = stringRes("device_settings_more_settings"),
-                                            iconRes = "drawable/device_settings_ic_more_settings.webp",
-                                            onClick = { navStack.add(ScreenDestination.MoreSettings) }
-                                        )
+                                        // More Settings (function_more_setting - Group 3) -> Opens full MiuixMoreSettingsScreen
+                                        if (currentModel.hasGroup(OfficialGroupIds.GROUP_FUNCTION_SETTING)) {
+                                            XiaomiActionItem(
+                                                title = stringRes("device_settings_more_settings"),
+                                                iconRes = "drawable/device_settings_ic_more_settings.webp",
+                                                onClick = { navStack.add(ScreenDestination.MoreSettings) }
+                                            )
+                                        }
                                     }
 
                                     // 5. Function Group 2: Device Management (function_layout2)
                                     XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
-                                        // Find Device -> Opens full MiuixFindDeviceScreen
-                                        if (currentModel.hasFindDevice) {
+                                        // Find Device (function 5001) -> Opens full MiuixFindDeviceScreen
+                                        if (currentModel.hasFunction(OfficialFunctionIds.FUNC_FIND_DEVICE) || currentModel.hasFindDevice) {
                                             XiaomiActionItem(
                                                 title = stringRes("device_settings_find_device"),
                                                 iconRes = "drawable/device_settings_ic_find_device.webp",
@@ -405,26 +427,68 @@ fun MainWindow(
                                         )
                                     }
 
-                                    // 6. Function Group 3: Sports (function_sport_layout)
-                                    if (currentModel.codename == "O73" || currentModel.isBoneConduction) {
+                                    // 6. Function Group 3: Sports (function_sport_layout - Group 8)
+                                    if (currentModel.hasGroup(OfficialGroupIds.GROUP_SPORT) || currentModel.moreSettingsCapabilities.hasSport || currentModel.isBoneConduction) {
                                         XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
                                             XiaomiActionItem(
                                                 title = stringRes("device_settings_sport_config"),
                                                 iconRes = "drawable/device_settings_sport_settings.png",
                                                 onClick = { navStack.add(ScreenDestination.SportSettings) }
                                             )
+                                            if (currentModel.hasFunction(OfficialFunctionIds.FUNC_EXERCISE_REPORT)) {
+                                                XiaomiItemDivider()
+                                                XiaomiActionItem(
+                                                    title = stringRes("device_settings_exercise_report"),
+                                                    iconRes = "drawable/device_settings_ic_exercise.png",
+                                                    onClick = { navStack.add(ScreenDestination.SportSettings) }
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Function Group: Dongle (function_dongle_layout - Group 7)
+                                    if (currentModel.hasGroup(OfficialGroupIds.GROUP_USB) || currentModel.hasDongle) {
+                                        XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
+                                            XiaomiActionItem(
+                                                title = stringRes("device_settings_dongle_settings"),
+                                                iconRes = "drawable/dongle_settings_volume_normal.png",
+                                                onClick = { navStack.add(ScreenDestination.DongleSettings) }
+                                            )
                                             XiaomiItemDivider()
                                             XiaomiActionItem(
-                                                title = stringRes("device_settings_exercise_report"),
-                                                iconRes = "drawable/device_settings_ic_exercise.png",
-                                                onClick = { navStack.add(ScreenDestination.SportSettings) }
+                                                title = stringRes("device_settings_usb_firmware_update"),
+                                                iconRes = "drawable/device_settings_usb_update.webp",
+                                                onClick = { navStack.add(ScreenDestination.DongleSettings) }
                                             )
                                         }
                                     }
 
-                                    // 7. Function Group 4: Help & About
+                                    // Function Group: Help & About (matching device_settings_item_function_layout.xml)
                                     XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
-                                        // About Device -> Opens full MiuixDeviceInfoScreen
+                                        XiaomiActionItem(
+                                            title = stringRes("device_settings_beginner_guide"),
+                                            iconRes = "drawable/device_settings_function_guide.png",
+                                            onClick = { currentScreen = AppScreen.WELCOME }
+                                        )
+                                        XiaomiItemDivider()
+                                        XiaomiActionItem(
+                                            title = stringRes("device_settings_device_introduce"),
+                                            iconRes = "drawable/device_settings_introduce.webp",
+                                            onClick = { navStack.add(ScreenDestination.DeviceInfo) }
+                                        )
+                                        XiaomiItemDivider()
+                                        XiaomiActionItem(
+                                            title = stringRes("device_settings_questions_answers"),
+                                            iconRes = "drawable/device_settings_ic_faq.webp",
+                                            onClick = { navStack.add(ScreenDestination.MoreSettings) }
+                                        )
+                                        XiaomiItemDivider()
+                                        XiaomiActionItem(
+                                            title = stringRes("device_settings_anti_disconnect_protection"),
+                                            iconRes = "drawable/device_settings_ic_disconnect_protect.webp",
+                                            onClick = { navStack.add(ScreenDestination.MoreSettings) }
+                                        )
+                                        XiaomiItemDivider()
                                         XiaomiActionItem(
                                             title = stringRes("device_settings_about_device"),
                                             iconRes = "drawable/device_settings_ic_about_device.webp",

@@ -405,5 +405,180 @@ object OfficialPayloadCodecs {
             }
         }
     }
+
+    // -------------------------------------------------------------
+    // 13. GET DEVICE CONFIG PARAMS (OpCode 243 / 0xF3)
+    // -------------------------------------------------------------
+    object GetDeviceConfigCodec {
+        fun encode(vararg configIds: Int): ByteArray {
+            val bytes = ByteArray(configIds.size * 2)
+            var i = 0
+            for (id in configIds) {
+                bytes[i++] = ((id shr 8) and 0xFF).toByte()
+                bytes[i++] = (id and 0xFF).toByte()
+            }
+            return bytes
+        }
+
+        fun encode(configIds: Collection<Int>): ByteArray = encode(*configIds.toIntArray())
+
+        fun decode(bytes: ByteArray): IntArray {
+            val count = bytes.size / 2
+            val ids = IntArray(count)
+            for (i in 0 until count) {
+                val msb = bytes[i * 2].toInt() and 0xFF
+                val lsb = bytes[i * 2 + 1].toInt() and 0xFF
+                ids[i] = (msb shl 8) or lsb
+            }
+            return ids
+        }
+    }
+
+    // -------------------------------------------------------------
+    // 14. REPORT DEVICE STATUS (OpCode 14 / 0x0E)
+    // -------------------------------------------------------------
+    data class DeviceStatusReport(
+        val batteryLeft: Int? = null,
+        val batteryRight: Int? = null,
+        val batteryCase: Int? = null,
+        val ancStatus: Int? = null, // 0 = Off, 1 = ANC, 2 = Transparent
+        val twsStatus: Int? = null
+    )
+
+    object DeviceStatusCodec {
+        fun parse(paramData: ByteArray): DeviceStatusReport {
+            var batteryLeft: Int? = null
+            var batteryRight: Int? = null
+            var batteryCase: Int? = null
+            var ancStatus: Int? = null
+            var twsStatus: Int? = null
+
+            val length = paramData.size
+            var offset = 0
+            while (offset + 1 < length) {
+                val len = paramData[offset].toInt() and 0xFF
+                if (len <= 0 || offset + 1 + len > length) break
+                val type = paramData[offset + 1].toInt() and 0xFF
+                val valueLen = len - 1
+                val valStart = offset + 2
+
+                when (type) {
+                    0 -> { // mulQuantity: battery percentages
+                        if (valueLen >= 1) batteryLeft = paramData[valStart].toInt() and 0xFF
+                        if (valueLen >= 2) batteryRight = paramData[valStart + 1].toInt() and 0xFF
+                        if (valueLen >= 3) batteryCase = paramData[valStart + 2].toInt() and 0xFF
+                    }
+                    1 -> { // twsStatus
+                        if (valueLen >= 1) twsStatus = paramData[valStart].toInt() and 0xFF
+                    }
+                    4 -> { // ancStatus: 0 = Off, 1 = ANC, 2 = Transparent
+                        if (valueLen >= 1) ancStatus = paramData[valStart].toInt() and 0xFF
+                    }
+                }
+                offset += len + 1
+            }
+
+            return DeviceStatusReport(
+                batteryLeft = batteryLeft,
+                batteryRight = batteryRight,
+                batteryCase = batteryCase,
+                ancStatus = ancStatus,
+                twsStatus = twsStatus
+            )
+        }
+
+        fun encode(report: DeviceStatusReport): ByteArray {
+            val buffer = ByteBuffer.allocate(64)
+            if (report.batteryLeft != null || report.batteryRight != null || report.batteryCase != null) {
+                val left = (report.batteryLeft ?: 0).toByte()
+                val right = (report.batteryRight ?: 0).toByte()
+                val case = (report.batteryCase ?: 0).toByte()
+                buffer.put(4.toByte()) // len = 4 (type + 3 bytes)
+                buffer.put(0.toByte()) // type = 0
+                buffer.put(left)
+                buffer.put(right)
+                buffer.put(case)
+            }
+            if (report.ancStatus != null) {
+                buffer.put(2.toByte()) // len = 2 (type + 1 byte)
+                buffer.put(4.toByte()) // type = 4
+                buffer.put(report.ancStatus.toByte())
+            }
+            if (report.twsStatus != null) {
+                buffer.put(2.toByte())
+                buffer.put(1.toByte())
+                buffer.put(report.twsStatus.toByte())
+            }
+            buffer.flip()
+            val result = ByteArray(buffer.remaining())
+            buffer.get(result)
+            return result
+        }
+    }
+
+    // -------------------------------------------------------------
+    // 15. DEVICE RUN INFO (OpCode 9 / 0x09)
+    // -------------------------------------------------------------
+    object DeviceRunInfoCodec {
+        fun encodeAncStatus(ancStatus: Int): ByteArray {
+            return byteArrayOf(2, 9, ancStatus.toByte())
+        }
+
+        fun parseAncStatus(paramData: ByteArray): Int? {
+            val length = paramData.size
+            var offset = 0
+            while (offset + 1 < length) {
+                val len = paramData[offset].toInt() and 0xFF
+                if (len <= 0 || offset + 1 + len > length) break
+                val type = paramData[offset + 1].toInt() and 0xFF
+                val valueLen = len - 1
+                val valStart = offset + 2
+
+                when (type) {
+                    9 -> { // ancStatus
+                        if (valueLen >= 1) return paramData[valStart].toInt() and 0xFF
+                    }
+                    5 -> { // vendorData
+                        val vendorMap = VendorDataCodec.parse(paramData.copyOfRange(valStart, valStart + valueLen))
+                        val noiseData = vendorMap[VendorDataCodec.TYPE_NOISE]
+                        if (noiseData != null && noiseData.isNotEmpty()) {
+                            return noiseData[0].toInt() and 0xFF
+                        }
+                    }
+                }
+                offset += len + 1
+            }
+            return null
+        }
+    }
+
+    // -------------------------------------------------------------
+    // 16. VENDOR DATA (OpCode 8 / 0x08 - CMD_SET_TARGET_INFO)
+    // -------------------------------------------------------------
+    object VendorDataCodec {
+        const val TYPE_NOISE: Byte = 4
+        const val TYPE_WEAR: Byte = 6
+
+        fun encodeNoiseMode(ancType: Byte): ByteArray {
+            // Format: [len = 2, type = 4, ancType]
+            return byteArrayOf(2, TYPE_NOISE, ancType)
+        }
+
+        fun parse(data: ByteArray): Map<Byte, ByteArray> {
+            val map = mutableMapOf<Byte, ByteArray>()
+            var offset = 0
+            while (offset + 1 < data.size) {
+                val len = data[offset].toInt() and 0xFF
+                if (len <= 0 || offset + 1 + len > data.size) break
+                val type = data[offset + 1]
+                val valLen = len - 1
+                val value = if (valLen > 0) data.copyOfRange(offset + 2, offset + 2 + valLen) else ByteArray(0)
+                map[type] = value
+                offset += len + 1
+            }
+            return map
+        }
+    }
 }
+
 

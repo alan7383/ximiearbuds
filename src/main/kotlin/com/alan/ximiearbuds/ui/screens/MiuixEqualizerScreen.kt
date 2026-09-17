@@ -2,6 +2,7 @@ package com.alan.ximiearbuds.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,9 +20,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.alan.ximiearbuds.core.device.DeviceRegistry
 import com.alan.ximiearbuds.core.device.EarbudsController
 import com.alan.ximiearbuds.core.protocol.EqBand
 import com.alan.ximiearbuds.core.protocol.EqPreset
+import com.alan.ximiearbuds.core.protocol.OfficialFunctionIds
 import com.alan.ximiearbuds.ui.components.MiuixTopAppBar
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
 import com.alan.ximiearbuds.ui.theme.stringRes
@@ -31,8 +34,8 @@ import com.alan.ximiearbuds.ui.theme.stringRes
  * 
  * Replaces the popup dialog with an authentic full-screen MIUI fragment:
  * - Top navigation bar with back arrow
- * - Preset selector chips (Standard, Vocal, Treble, Bass, Custom)
- * - 10-Band graphic equalizer with vertical gain bars (-10 dB to +10 dB)
+ * - Preset selector chips dynamically populated from each model's supported sound modes
+ * - 10-Band graphic equalizer with vertical gain bars (-10 dB to +10 dB) if supported
  * - Curve reset button with official confirmation dialog
  */
 @Composable
@@ -41,9 +44,39 @@ fun MiuixEqualizerScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val activeModel by controller.activeModel.collectAsState()
+    val model = activeModel ?: DeviceRegistry.GENERIC_MODEL
+    val soundCaps = model.soundCapabilities
     val eqState by controller.equalizer.collectAsState()
     val scrollState = rememberScrollState()
     var showResetDialog by remember { mutableStateOf(false) }
+
+    val has10BandEq = model.has10BandEq || model.supportedFunctionIds.isEmpty() || model.hasFunction(OfficialFunctionIds.FUNC_SOUND_SETTINGS_SOUND_MODE)
+
+    // Build preset list matching decompiled SoundEffectVM.java & SoundEffectExtKt.java
+    val presets = remember(model) {
+        val list = mutableListOf<EqPreset>()
+        if (soundCaps.supportedPresets.isNotEmpty()) {
+            soundCaps.supportedPresets.forEach { presetId ->
+                val preset = EqPreset.fromId(presetId)
+                if (!list.contains(preset)) list.add(preset)
+            }
+            if (has10BandEq && !list.contains(EqPreset.CUSTOM)) {
+                list.add(EqPreset.CUSTOM)
+            }
+        } else {
+            list.addAll(
+                listOf(
+                    EqPreset.BALANCED,
+                    EqPreset.VOICE,
+                    EqPreset.TREBLE,
+                    EqPreset.BASS,
+                    EqPreset.CUSTOM
+                )
+            )
+        }
+        list
+    }
 
     if (showResetDialog) {
         AlertDialog(
@@ -79,13 +112,15 @@ fun MiuixEqualizerScreen(
             title = stringRes("device_settings_audio_equalizer"),
             onBackClick = onBackClick,
             actions = {
-                IconButton(onClick = { showResetDialog = true }) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = stringRes("device_settings_whether_to_clear_equalizer_params"),
-                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                        modifier = Modifier.size(20.dp)
-                    )
+                if (has10BandEq) {
+                    IconButton(onClick = { showResetDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = stringRes("device_settings_whether_to_clear_equalizer_params"),
+                            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         )
@@ -114,31 +149,27 @@ fun MiuixEqualizerScreen(
             // Preset Pills Container
             XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
                 Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                    val presets = listOf(
-                        EqPreset.STANDARD to stringRes("device_settings_sound_balanced"),
-                        EqPreset.VOICE to stringRes("device_settings_sound_vocal_enhancement"),
-                        EqPreset.TREBLE to stringRes("device_settings_sound_treble_boost"),
-                        EqPreset.BASS to stringRes("device_settings_sound_bass_boost"),
-                        EqPreset.CUSTOM to stringRes("device_settings_sound_custom")
-                    )
+                    val pillsScrollState = rememberScrollState()
 
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(4.dp)
+                            .then(if (presets.size > 5) Modifier.horizontalScroll(pillsScrollState) else Modifier),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        for ((preset, label) in presets) {
+                        for (preset in presets) {
                             val isSelected = eqState.preset == preset
+                            val label = stringRes(preset.stringKey)
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .then(if (presets.size <= 5) Modifier.weight(1f) else Modifier.padding(horizontal = 8.dp))
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (isSelected) Color(0xFF007AFF) else Color.Transparent)
                                     .clickable { controller.setEqPreset(preset) }
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -155,56 +186,58 @@ fun MiuixEqualizerScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            if (has10BandEq) {
+                Spacer(modifier = Modifier.height(20.dp))
 
-            // 10-Band Graphic Studio Section Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "COURBE DE GAIN (10 BANDES)",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 11.sp,
-                        letterSpacing = 0.5.sp
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                )
-
-                Text(
-                    text = "-10 dB à +10 dB",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
-                )
-            }
-
-            // Sliders Container
-            XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
-                Column(
+                // 10-Band Graphic Studio Section Header
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 20.dp, horizontal = 12.dp)
+                        .padding(horizontal = 24.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Sliders Row
-                    Row(
+                    Text(
+                        text = stringRes("device_settings_audio_equalizer").uppercase(),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 11.sp,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                    )
+
+                    Text(
+                        text = "-10 dB à +10 dB",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                    )
+                }
+
+                // Sliders Container
+                XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(vertical = 20.dp, horizontal = 12.dp)
                     ) {
-                        for (band in eqState.bands) {
-                            MiuixVerticalEqSlider(
-                                band = band,
-                                onGainChange = { newGain ->
-                                    controller.setEqBandGain(band.frequencyHz, newGain)
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
+                        // Sliders Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            for (band in eqState.bands) {
+                                MiuixVerticalEqSlider(
+                                    band = band,
+                                    onGainChange = { newGain ->
+                                        controller.setEqBandGain(band.frequencyHz, newGain)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                     }
                 }

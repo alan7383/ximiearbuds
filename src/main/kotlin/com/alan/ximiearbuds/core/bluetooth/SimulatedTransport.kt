@@ -92,6 +92,34 @@ class SimulatedTransport(
         scope.launch {
             delay(30) // Simulate processing time
             when (packet.opCode) {
+                RcspPacket.CMD_AUTH_CHECK -> {
+                    val randFactor = if (packet.payload.size >= 17) packet.payload.copyOfRange(1, 17) else ByteArray(16)
+                    val encrypted = com.alan.ximiearbuds.core.crypto.BluetoothAuthEngine.encrypt(randFactor)
+                    _incomingPackets.emit(
+                        RcspPacket(
+                            type = RcspPacket.TYPE_RESPONSE,
+                            hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                            targetApp = packet.targetApp,
+                            opCode = RcspPacket.CMD_AUTH_CHECK,
+                            opCodeSn = packet.opCodeSn,
+                            status = 0,
+                            payload = byteArrayOf(0x01) + encrypted
+                        )
+                    )
+                }
+                RcspPacket.CMD_AUTH_SEND_CALC_RESULT -> {
+                    _incomingPackets.emit(
+                        RcspPacket(
+                            type = RcspPacket.TYPE_RESPONSE,
+                            hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                            targetApp = packet.targetApp,
+                            opCode = RcspPacket.CMD_AUTH_SEND_CALC_RESULT,
+                            opCodeSn = packet.opCodeSn,
+                            status = 0,
+                            payload = byteArrayOf(0x01)
+                        )
+                    )
+                }
                 RcspPacket.CMD_GET_TARGET_INFO -> {
                     sendTargetInfoResponse(packet.opCodeSn)
                 }
@@ -145,6 +173,36 @@ class SimulatedTransport(
                         opCodeSn = packet.opCodeSn,
                         status = 0,
                         payload = ByteArray(0)
+                    )
+                    _incomingPackets.emit(resp)
+                }
+                RcspPacket.CMD_SET_TARGET_INFO -> {
+                    val vendorMap = OfficialPayloadCodecs.VendorDataCodec.parse(packet.payload)
+                    vendorMap[OfficialPayloadCodecs.VendorDataCodec.TYPE_NOISE]?.let { modeBytes ->
+                        if (modeBytes.isNotEmpty()) {
+                            simulatedNoise = simulatedNoise.copy(mode = NoiseMode.fromId(modeBytes[0].toInt() and 0xFF))
+                        }
+                    }
+                    val resp = RcspPacket(
+                        type = RcspPacket.TYPE_RESPONSE,
+                        hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                        targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                        opCode = RcspPacket.CMD_SET_TARGET_INFO,
+                        opCodeSn = packet.opCodeSn,
+                        status = 0,
+                        payload = ByteArray(0)
+                    )
+                    _incomingPackets.emit(resp)
+                }
+                RcspPacket.CMD_GET_DEVICE_RUN_INFO -> {
+                    val resp = RcspPacket(
+                        type = RcspPacket.TYPE_RESPONSE,
+                        hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                        targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                        opCode = RcspPacket.CMD_GET_DEVICE_RUN_INFO,
+                        opCodeSn = packet.opCodeSn,
+                        status = 0,
+                        payload = OfficialPayloadCodecs.DeviceRunInfoCodec.encodeAncStatus(simulatedNoise.mode.id)
                     )
                     _incomingPackets.emit(resp)
                 }

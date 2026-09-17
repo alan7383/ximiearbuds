@@ -251,39 +251,36 @@ class LinuxRfcommTransport(
 
         try {
             val libc = LibC.INSTANCE
-            val fd = libc.socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM)
             var connected = false
+            // Candidate RFCOMM SPP channels for Xiaomi earbuds:
+            // 24 = "miwear" (UUID_SPP_MIUI 0xFD2D, Redmi Buds 6 Pro / modern Xiaomi earbuds)
+            // 21 = "Airoha_APP" (Airoha chipset Serial Port)
+            // 3 = "mitaw" (Xiaomi Serial Port)
+            // 8 = "BTNOTIFYR6"
+            // Note: Channels 1 (HFP) and 2 (HSP) are strictly excluded as they are audio telephony ports.
+            val candidateChannels = listOf(24, 21, 3, 8)
 
-            if (fd >= 0) {
-                val addr = SockAddrRc()
-                addr.rc_family = AF_BLUETOOTH.toShort()
-                addr.rc_bdaddr = parseMac(address)
-                addr.rc_channel = 1 // Standard RFCOMM Channel 1 for SPP
+            for (ch in candidateChannels) {
+                val fd = libc.socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM)
+                if (fd >= 0) {
+                    val addr = SockAddrRc()
+                    addr.rc_family = AF_BLUETOOTH.toShort()
+                    addr.rc_bdaddr = parseMac(address)
+                    addr.rc_channel = ch.toByte()
 
-                val res = libc.connect(fd, addr, addr.size())
-                if (res >= 0) {
-                    socketFd = fd
-                    connected = true
-                } else {
-                    libc.close(fd)
-                    // Try channel 2, 3, 4 if channel 1 rejected
-                    for (ch in 2..4) {
-                        addr.rc_channel = ch.toByte()
-                        val fdRetry = libc.socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM)
-                        if (fdRetry >= 0) {
-                            if (libc.connect(fdRetry, addr, addr.size()) == 0) {
-                                socketFd = fdRetry
-                                connected = true
-                                break
-                            } else {
-                                libc.close(fdRetry)
-                            }
-                        }
+                    val res = libc.connect(fd, addr, addr.size())
+                    if (res >= 0) {
+                        println("LinuxRfcommTransport: Successfully connected to RCSP channel $ch")
+                        socketFd = fd
+                        connected = true
+                        break
+                    } else {
+                        libc.close(fd)
                     }
                 }
             }
 
-            // Check if BlueZ itself reports connected
+            // Check if BlueZ itself reports connected (A2DP/HFP audio)
             val isBluezConnected = try {
                 val check = ProcessBuilder("bluetoothctl", "info", address).start()
                 val txt = check.inputStream.bufferedReader().readText()
@@ -291,7 +288,7 @@ class LinuxRfcommTransport(
                 txt.contains("Connected: yes", ignoreCase = true)
             } catch (_: Exception) { false }
 
-            if (connected || isBluezConnected) {
+            if (connected) {
                 _connectionState.value = ConnectionState.CONNECTED
                 val details = inspectDevice(address, "Xiaomi Earbuds")
                 val matchedDev = queryDevices().find { it.address.equals(address, ignoreCase = true) }
@@ -303,9 +300,46 @@ class LinuxRfcommTransport(
                         colorType = details.colorType
                     )
                 _connectedDevice.value = matchedDev
+                startListening()
+                return@withContext true
+            } else if (isBluezConnected) {
+                println("LinuxRfcommTransport: Device audio is connected via BlueZ, but vendor RFCOMM data channels ($candidateChannels) were refused.")
+                println("LinuxRfcommTransport: Note: If a mobile phone app (e.g. Xiaomi Earbuds) is actively connected to the earbuds, it holds the exclusive RFCOMM control session.")
+                
+                val details = inspectDevice(address, "Xiaomi Earbuds")
+                val matchedDev = queryDevices().find { it.address.equals(address, ignoreCase = true) }
+                    ?: DiscoveredDevice(
+                        name = details.name,
+                        address = address,
+                        isConnected = true,
+                        isXiaomiEarbuds = details.isXiaomi,
+                        colorType = details.colorType
+                    )
+                _connectedDevice.value = matchedDev
+                _connectionState.value = ConnectionState.CONNECTED
 
-                if (connected) {
-                    startListening()
+                // Launch a background worker to connect to the RFCOMM socket as soon as the phone releases it
+                scope.launch(Dispatchers.IO) {
+                    while (isActive && socketFd < 0 && _connectionState.value == ConnectionState.CONNECTED) {
+                        delay(2500)
+                        for (ch in candidateChannels) {
+                            val fdRetry = libc.socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM)
+                            if (fdRetry >= 0) {
+                                val addr = SockAddrRc()
+                                addr.rc_family = AF_BLUETOOTH.toShort()
+                                addr.rc_bdaddr = parseMac(address)
+                                addr.rc_channel = ch.toByte()
+                                if (libc.connect(fdRetry, addr, addr.size()) >= 0) {
+                                    println("LinuxRfcommTransport: Reconnected to RFCOMM RCSP channel $ch!")
+                                    socketFd = fdRetry
+                                    startListening()
+                                    break
+                                } else {
+                                    libc.close(fdRetry)
+                                }
+                            }
+                        }
+                    }
                 }
                 return@withContext true
             } else {
@@ -332,16 +366,14 @@ class LinuxRfcommTransport(
                     }
 
                     // Parse packets from accumulated stream
-                    val parsedPackets = RcspPacket.parseStream(streamAccumulator.toByteArray())
+                    val (parsedPackets, consumed) = RcspPacket.parseStreamWithConsumed(streamAccumulator.toByteArray())
                     if (parsedPackets.isNotEmpty()) {
                         for (pkt in parsedPackets) {
+                            println("LinuxRfcommTransport: Incoming RCSP packet opCode=${pkt.opCode} status=${pkt.status} payloadLen=${pkt.payload.size}")
                             _incomingPackets.emit(pkt)
                         }
-                        // Clear parsed bytes from buffer by keeping remaining
-                        val lastPacket = parsedPackets.last()
-                        val lastEndIdx = streamAccumulator.lastIndexOf(RcspPacket.END_BYTE)
-                        if (lastEndIdx >= 0 && lastEndIdx + 1 <= streamAccumulator.size) {
-                            val remaining = streamAccumulator.subList(lastEndIdx + 1, streamAccumulator.size).toList()
+                        if (consumed > 0 && consumed <= streamAccumulator.size) {
+                            val remaining = streamAccumulator.subList(consumed, streamAccumulator.size).toList()
                             streamAccumulator.clear()
                             streamAccumulator.addAll(remaining)
                         }
@@ -369,11 +401,13 @@ class LinuxRfcommTransport(
 
     override suspend fun send(packet: RcspPacket): Boolean = withContext(Dispatchers.IO) {
         if (socketFd < 0 || _connectionState.value != ConnectionState.CONNECTED) {
+            println("LinuxRfcommTransport: Cannot send packet opCode=${packet.opCode} (socketFd=$socketFd, state=${_connectionState.value})")
             return@withContext false
         }
 
         val data = packet.toByteArray()
         val written = LibC.INSTANCE.write(socketFd, data, data.size)
+        println("LinuxRfcommTransport: Sent packet opCode=${packet.opCode} size=${data.size} written=$written")
         return@withContext written == data.size
     }
 }

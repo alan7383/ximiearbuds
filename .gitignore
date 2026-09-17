@@ -10,3 +10,5 @@ hs_err_pid*
 decompiled
 decompiled/
 ximiearbuds_decompiled/
+__pycache__/
+*.pyc

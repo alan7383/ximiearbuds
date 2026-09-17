@@ -41,12 +41,16 @@ fun MiuixMoreSettingsScreen(
 ) {
     val quickSettings by controller.quickSettings.collectAsState()
     val deviceInfo by controller.deviceInfo.collectAsState()
+    val activeModel by controller.activeModel.collectAsState()
+    val model = activeModel ?: com.alan.ximiearbuds.core.device.DeviceRegistry.GENERIC_MODEL
     val scrollState = rememberScrollState()
 
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
     var showRemoveDialog by remember { mutableStateOf(false) }
     var speechToChat by remember { mutableStateOf(false) }
+    var autoPickCall by remember { mutableStateOf(false) }
+    var voiceHotword by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -68,82 +72,135 @@ fun MiuixMoreSettingsScreen(
         ) {
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Section Header: Paramètres des fonctionnalités (label_function)
-            Text(
-                text = stringRes("device_settings_function_settings").uppercase(),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 11.sp,
-                    letterSpacing = 0.5.sp
-                ),
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
-            )
-
-            XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
-                // Speech-to-Chat / Conversation libre (handsFreeView)
-                XiaomiSwitchItem(
-                    title = stringRes("device_settings_hands_free"),
-                    subtitle = stringRes("device_settings_limpid_desc"),
-                    checked = speechToChat,
-                    onCheckedChange = { speechToChat = it }
+            // Section Header: Paramètres des fonctionnalités (label_function) - Group 3
+            if (model.hasGroup(com.alan.ximiearbuds.core.protocol.OfficialGroupIds.GROUP_FUNCTION_SETTING)) {
+                Text(
+                    text = stringRes("device_settings_function_settings").uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.sp,
+                        letterSpacing = 0.5.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
                 )
 
-                XiaomiItemDivider()
+                XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
+                    var hasPrevious = false
 
-                // In-Ear Wear Detection (monitorView)
-                XiaomiSwitchItem(
-                    title = stringRes("device_settings_wear_detection"),
-                    subtitle = stringRes("device_settings_wear_detection_des"),
-                    checked = quickSettings.inEarDetection,
-                    onCheckedChange = { controller.setInEarDetection(it) }
-                )
+                    // Speech-to-Chat / Conversation libre (handsFreeView - 3001)
+                    if (model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_SMART_FREE_PICK)) {
+                        XiaomiSwitchItem(
+                            title = stringRes("device_settings_hands_free"),
+                            subtitle = stringRes("device_settings_limpid_desc"),
+                            checked = speechToChat,
+                            onCheckedChange = { speechToChat = it }
+                        )
+                        hasPrevious = true
+                    }
 
-                XiaomiItemDivider()
+                    // In-Ear Wear Detection (monitorView - 3002)
+                    if (model.moreSettingsCapabilities.hasWearDetection || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_WEAR_DETECTION)) {
+                        if (hasPrevious) XiaomiItemDivider()
+                        XiaomiSwitchItem(
+                            title = stringRes("device_settings_wear_detection"),
+                            subtitle = stringRes("device_settings_wear_detection_des"),
+                            checked = quickSettings.inEarDetection,
+                            onCheckedChange = { controller.setInEarDetection(it) }
+                        )
+                        hasPrevious = true
+                    }
 
-                // Dual Device Multipoint (multy_connect_View)
-                XiaomiSwitchItem(
-                    title = stringRes("device_settings_dual_device_connect"),
-                    subtitle = stringRes("device_settings_dual_device_connect_desc"),
-                    checked = quickSettings.multipoint,
-                    onCheckedChange = { controller.setMultipoint(it) }
-                )
+                    // Dual Device Multipoint (multy_connect_View - 3004)
+                    if (model.moreSettingsCapabilities.hasMultipoint || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_DUAL_DEVICE_CONNECTION)) {
+                        if (hasPrevious) XiaomiItemDivider()
+                        XiaomiSwitchItem(
+                            title = stringRes("device_settings_dual_device_connect"),
+                            subtitle = stringRes("device_settings_dual_device_connect_desc"),
+                            checked = quickSettings.multipoint,
+                            onCheckedChange = { controller.setMultipoint(it) }
+                        )
+                        hasPrevious = true
+                    }
 
-                XiaomiItemDivider()
+                    // Low Latency Gaming Mode (low_latency - 3011 / 3009)
+                    if (model.moreSettingsCapabilities.hasLowLatency || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_LOW_LATENCY)) {
+                        if (hasPrevious) XiaomiItemDivider()
+                        XiaomiSwitchItem(
+                            title = stringRes("device_settings_spatial_audio_low_latency"),
+                            subtitle = stringRes("device_settings_low_latency_desc"),
+                            checked = quickSettings.lowLatency,
+                            onCheckedChange = { controller.setLowLatency(it) }
+                        )
+                        hasPrevious = true
+                    }
 
-                // Low Latency Gaming Mode (low_latency)
-                XiaomiSwitchItem(
-                    title = stringRes("device_settings_spatial_audio_low_latency"),
-                    subtitle = stringRes("device_settings_low_latency_desc"),
-                    checked = quickSettings.lowLatency,
-                    onCheckedChange = { controller.setLowLatency(it) }
-                )
+                    // Auto Pick Call (3008)
+                    if (model.moreSettingsCapabilities.hasAutoPickCall || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_AUTO_PICK_CALL)) {
+                        if (hasPrevious) XiaomiItemDivider()
+                        XiaomiSwitchItem(
+                            title = stringRes("device_settings_auto_pick_call"),
+                            subtitle = stringRes("device_settings_auto_pick_call_desc"),
+                            checked = autoPickCall,
+                            onCheckedChange = { autoPickCall = it }
+                        )
+                        hasPrevious = true
+                    }
 
-                XiaomiItemDivider()
+                    // Voice Control Hotword (3005)
+                    if (model.moreSettingsCapabilities.hasVoiceControl || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_VOICE_CONTROL)) {
+                        if (hasPrevious) XiaomiItemDivider()
+                        XiaomiSwitchItem(
+                            title = stringRes("device_settings_voice_control"),
+                            subtitle = stringRes("device_settings_voice_control_detail"),
+                            checked = voiceHotword,
+                            onCheckedChange = { voiceHotword = it }
+                        )
+                        hasPrevious = true
+                    }
 
-                // Fit Detection (fitDetect)
-                XiaomiActionItem(
-                    title = stringRes("device_settings_fit_detection"),
-                    subtitle = stringRes("login_guide_fit_detect_detail"),
-                    onClick = onNavigateToFitDetection
-                )
+                    // Fit Detection (fitDetect - 3003)
+                    if (model.moreSettingsCapabilities.hasFitDetection || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_FIT_DETECT)) {
+                        if (hasPrevious) XiaomiItemDivider()
+                        XiaomiActionItem(
+                            title = stringRes("device_settings_fit_detection"),
+                            subtitle = stringRes("login_guide_fit_detect_detail"),
+                            onClick = onNavigateToFitDetection
+                        )
+                        hasPrevious = true
+                    }
 
-                XiaomiItemDivider()
+                    // Ear Canal Detection (3013)
+                    if (model.moreSettingsCapabilities.hasEarCanalDetection || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_EAR_CANAL_DETECTION)) {
+                        if (hasPrevious) XiaomiItemDivider()
+                        XiaomiActionItem(
+                            title = stringRes("device_settings_ear_canal_detection"),
+                            subtitle = stringRes("device_settings_ear_canal_detection_desc"),
+                            onClick = onNavigateToFitDetection
+                        )
+                        hasPrevious = true
+                    }
 
-                // Earbox Sound (earbox)
-                XiaomiActionItem(
-                    title = stringRes("device_settings_earbox_sound"),
-                    subtitle = stringRes("device_settings_earbox_charge_sound"),
-                    onClick = onNavigateToEarbox
-                )
+                    // Earbox Sound (earbox - 3015)
+                    if (model.moreSettingsCapabilities.hasEarboxSound || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_EARBOX_SOUND)) {
+                        if (hasPrevious) XiaomiItemDivider()
+                        XiaomiActionItem(
+                            title = stringRes("device_settings_earbox_sound"),
+                            subtitle = stringRes("device_settings_earbox_charge_sound"),
+                            onClick = onNavigateToEarbox
+                        )
+                        hasPrevious = true
+                    }
 
-                if (onNavigateToDongle != null) {
-                    XiaomiItemDivider()
-                    XiaomiActionItem(
-                        title = stringRes("device_settings_dongle_mode"),
-                        subtitle = stringRes("device_settings_dongle_gesture_notify"),
-                        onClick = onNavigateToDongle
-                    )
+                    // Dongle mode (7001 or Group 7)
+                    if ((model.moreSettingsCapabilities.hasDongle || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_USB_MODE)) && onNavigateToDongle != null) {
+                        if (hasPrevious) XiaomiItemDivider()
+                        XiaomiActionItem(
+                            title = stringRes("device_settings_dongle_mode"),
+                            subtitle = stringRes("device_settings_dongle_gesture_notify"),
+                            onClick = onNavigateToDongle
+                        )
+                    }
                 }
             }
 

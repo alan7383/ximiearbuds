@@ -47,20 +47,35 @@ data class RcspPacket(
 
         // Standard RCSP OpCodes from com.xiaomi.aivsbluetoothsdk.constant.Command
         const val CMD_GET_TARGET_INFO = 2
-        const val CMD_SET_TARGET_INFO = 35
+        const val CMD_SET_TARGET_INFO = 8
         const val CMD_GET_DEVICE_RUN_INFO = 9
-        const val CMD_DISCONNECT_CLASSIC_BT = 5
-        const val CMD_REBOOT_DEVICE = 28
+        const val CMD_REPORT_DEVICE_STATUS = 14 // 0x0E (live ANC & battery updates)
+        const val CMD_DISCONNECT_CLASSIC_BT = 6
+        const val CMD_REBOOT_DEVICE = 3
         const val CMD_FIND_DEVICE = 66
         const val CMD_SET_DEVICE_CONFIG = 242 // 0xF2
         const val CMD_GET_DEVICE_CONFIG = 243 // 0xF3
         const val CMD_NOTIFY_DEVICE_CONFIG = 244 // 0xF4
-        const val CMD_SETTINGS_MTU = 30
+        const val CMD_AUTH_CHECK = 80 // 0x50 Challenge-response authentication
+        const val CMD_AUTH_SEND_CALC_RESULT = 81 // 0x51 Complete authentication
+        const val CMD_SETTINGS_MTU = 5
 
         private val sequenceCounter = AtomicInteger(1)
 
         fun nextSequenceNumber(): Int {
             return sequenceCounter.getAndUpdate { if (it >= 255) 1 else it + 1 }
+        }
+
+        fun createAckResponse(commandPacket: RcspPacket, status: Int = 0, payload: ByteArray = ByteArray(0)): RcspPacket {
+            return RcspPacket(
+                type = TYPE_RESPONSE,
+                hasResponse = FLAG_NO_RESPONSE,
+                targetApp = commandPacket.targetApp,
+                opCode = commandPacket.opCode,
+                opCodeSn = commandPacket.opCodeSn,
+                status = status,
+                payload = payload
+            )
         }
 
         fun parse(data: ByteArray): RcspPacket? {
@@ -69,10 +84,15 @@ data class RcspPacket(
         }
 
         fun parseStream(data: ByteArray): List<RcspPacket> {
+            return parseStreamWithConsumed(data).first
+        }
+
+        fun parseStreamWithConsumed(data: ByteArray): Pair<List<RcspPacket>, Int> {
             val packets = mutableListOf<RcspPacket>()
-            if (data.size < 8) return packets
+            if (data.size < 8) return Pair(packets, 0)
 
             var offset = 0
+            var lastConsumedOffset = 0
             while (offset <= data.size - 8) {
                 // Find start sequence 0xFE, 0xDC, 0xBA
                 if (data[offset] != START_BYTE_0 ||
@@ -144,9 +164,10 @@ data class RcspPacket(
                 )
 
                 offset += packetTotalLen
+                lastConsumedOffset = offset
             }
 
-            return packets
+            return Pair(packets, lastConsumedOffset)
         }
     }
 

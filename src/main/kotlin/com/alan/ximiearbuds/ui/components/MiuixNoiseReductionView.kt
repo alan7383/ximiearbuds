@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.alan.ximiearbuds.core.device.AncCapabilities
 import com.alan.ximiearbuds.core.protocol.AncLevel
 import com.alan.ximiearbuds.core.protocol.NoiseControlState
 import com.alan.ximiearbuds.ui.theme.stringRes
@@ -37,14 +38,16 @@ import com.alan.ximiearbuds.core.protocol.TransparencyLevel
  * 
  * Features:
  * - 3 large radio mode selectors (Transparency, ANC, Off) using official WebP icons
- * - LevelDotView stepped dot seekbar with discrete stops
- * - Low & High level anchor icons (`device_settings_trans_low.webp`, `device_settings_trans_high.webp`)
- * - Adaptive Smart Denoise switch
- * - Transparency mode chips (Standard, Vocal Enhancement, Ambient)
+ * - Adaptively hides Transparency if single-toggle or bone conduction
+ * - LevelDotView stepped dot seekbar with discrete stops matching model's tws_gear
+ * - Adaptive Smart Denoise switch (1008)
+ * - Personalized ANC switch (3012)
+ * - Transparency mode chips (Standard, Vocal Enhancement, Ambient) based on model's tws_gear
  */
 @Composable
 fun MiuixNoiseReductionView(
     noiseState: NoiseControlState,
+    capabilities: AncCapabilities = AncCapabilities(),
     onModeChange: (NoiseMode) -> Unit,
     onAncLevelChange: (AncLevel) -> Unit,
     onTransparencyLevelChange: (TransparencyLevel) -> Unit,
@@ -59,29 +62,31 @@ fun MiuixNoiseReductionView(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(cardBg)
             .padding(vertical = 16.dp, horizontal = 16.dp)
     ) {
-        // Row of 3 Radio Buttons: Transparency, ANC, Off
+        // Row of Radio Buttons: Transparency (if supported), ANC, Off
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.Top
         ) {
-            // 1. Transparency (noise_reduction_transparent)
-            MiuixNoiseRadioItem(
-                label = stringRes("device_settings_notification_transparency_mode"),
-                isSelected = noiseState.mode == NoiseMode.TRANSPARENCY,
-                normalDrawable = "drawable/device_settings_trans.webp",
-                checkedDrawable = "drawable/device_settings_trans_checked.webp",
-                onClick = { onModeChange(NoiseMode.TRANSPARENCY) },
-                modifier = Modifier.weight(1f)
-            )
+            // 1. Transparency (only if device supports transparency)
+            if (!capabilities.isSingleToggleOnly) {
+                MiuixNoiseRadioItem(
+                    label = stringRes("device_settings_noise_reduction_transparent"),
+                    isSelected = noiseState.mode == NoiseMode.TRANSPARENCY,
+                    normalDrawable = "drawable/device_settings_trans.webp",
+                    checkedDrawable = "drawable/device_settings_trans_checked.webp",
+                    onClick = { onModeChange(NoiseMode.TRANSPARENCY) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
             // 2. Active Noise Cancellation (noise_reduction_open)
             MiuixNoiseRadioItem(
-                label = stringRes("device_settings_noise_control"),
+                label = stringRes("device_settings_noise_reduction_open"),
                 isSelected = noiseState.mode == NoiseMode.ANC,
                 normalDrawable = "drawable/device_settings_noise.webp",
                 checkedDrawable = "drawable/device_settings_noise_checked.webp",
@@ -91,7 +96,7 @@ fun MiuixNoiseReductionView(
 
             // 3. Off (noise_reduction_close)
             MiuixNoiseRadioItem(
-                label = stringRes("device_settings_noise_close"),
+                label = stringRes("device_settings_noise_reduction_close"),
                 isSelected = noiseState.mode == NoiseMode.OFF,
                 normalDrawable = "drawable/device_settings_noise_close.webp",
                 checkedDrawable = "drawable/device_settings_noise_close_checked.webp",
@@ -114,36 +119,73 @@ fun MiuixNoiseReductionView(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Adaptive Denoise Toggle Row
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSmartDenoiseChange(!noiseState.isSmartDenoise) }
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringRes("device_settings_smart_denoise"),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = stringRes("device_settings_noise_reduction_adaptive_noise"),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                // Adaptive / Smart Denoise Toggle Row (if supported)
+                if (capabilities.hasSmartDenoise || capabilities.hasAdaptiveAnc) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSmartDenoiseChange(!noiseState.isSmartDenoise) }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringRes("device_settings_smart_denoise"),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringRes("device_settings_noise_reduction_adaptive_noise"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                            )
+                        }
+
+                        Switch(
+                            checked = noiseState.isSmartDenoise,
+                            onCheckedChange = onSmartDenoiseChange,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF007AFF)
+                            )
                         )
                     }
+                }
 
-                    Switch(
-                        checked = noiseState.isSmartDenoise,
-                        onCheckedChange = onSmartDenoiseChange,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = Color(0xFF007AFF)
+                // Personalized ANC Toggle Row (if supported by device, e.g. 3012)
+                if (capabilities.hasPersonalizedAnc) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPersonalizedAncChange(!noiseState.isPersonalizedAnc) }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringRes("device_settings_personalized_noise_reduction"),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringRes("device_settings_personalized_noise_reduction_desc"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                            )
+                        }
+
+                        Switch(
+                            checked = noiseState.isPersonalizedAnc,
+                            onCheckedChange = onPersonalizedAncChange,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF007AFF)
+                            )
                         )
-                    )
+                    }
                 }
 
                 // LevelDotView Stepped Slider (active if not smart denoise)
@@ -151,11 +193,11 @@ fun MiuixNoiseReductionView(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     val depthDescription = when (noiseState.ancLevel) {
-                        AncLevel.LIGHT -> "Réduction de bruit légère"
-                        AncLevel.BALANCED -> "Réduction de bruit équilibrée"
-                        AncLevel.DEEP, AncLevel.DEEP_PLUS -> "Réduction de bruit profonde"
-                        AncLevel.ADAPTIVE -> "Réduction adaptative"
-                        AncLevel.ANTIWIND -> "Anti-vent"
+                        AncLevel.LIGHT -> stringRes("device_settings_mild")
+                        AncLevel.BALANCED -> stringRes("device_settings_balanced")
+                        AncLevel.DEEP, AncLevel.DEEP_PLUS -> stringRes("device_settings_deep")
+                        AncLevel.ADAPTIVE -> stringRes("device_settings_noise_reduction_adaptive_noise")
+                        AncLevel.ANTIWIND -> stringRes("device_settings_wind_resistance")
                     }
 
                     Text(
@@ -171,9 +213,10 @@ fun MiuixNoiseReductionView(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Stepped Dot Track
+                    // Stepped Dot Track matching device's official gears
                     MiuixLevelDotView(
                         currentLevel = noiseState.ancLevel,
+                        supportedGears = capabilities.ancLevels,
                         onLevelSelected = onAncLevelChange
                     )
 
@@ -198,49 +241,58 @@ fun MiuixNoiseReductionView(
             }
         }
 
-        // Sub-controls for Transparency Mode
-        AnimatedVisibility(
-            visible = noiseState.mode == NoiseMode.TRANSPARENCY,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(top = 18.dp)) {
-                HorizontalDivider(
-                    thickness = 0.6.dp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = stringRes("device_settings_notification_transparency_mode"),
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    MiuixProfileChip(
-                        label = stringRes("device_settings_scene_standard"),
-                        selected = noiseState.transparencyLevel == TransparencyLevel.REGULAR,
-                        onClick = { onTransparencyLevelChange(TransparencyLevel.REGULAR) },
-                        modifier = Modifier.weight(1f)
+        // Sub-controls for Transparency Mode (if supported)
+        if (!capabilities.isSingleToggleOnly) {
+            AnimatedVisibility(
+                visible = noiseState.mode == NoiseMode.TRANSPARENCY,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 18.dp)) {
+                    HorizontalDivider(
+                        thickness = 0.6.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
                     )
-                    MiuixProfileChip(
-                        label = stringRes("device_settings_noise_reduction_transparent_person"),
-                        selected = noiseState.transparencyLevel == TransparencyLevel.VOCAL,
-                        onClick = { onTransparencyLevelChange(TransparencyLevel.VOCAL) },
-                        modifier = Modifier.weight(1f)
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = stringRes("device_settings_notification_transparency_mode"),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    MiuixProfileChip(
-                        label = stringRes("device_settings_noise_reduction_transparent_environment"),
-                        selected = noiseState.transparencyLevel == TransparencyLevel.AMBIENT,
-                        onClick = { onTransparencyLevelChange(TransparencyLevel.AMBIENT) },
-                        modifier = Modifier.weight(1f)
-                    )
+
+                    val tLevels = capabilities.transparencyLevels.ifEmpty { listOf(0, 1, 2) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (0 in tLevels) {
+                            MiuixProfileChip(
+                                label = stringRes("device_settings_scene_standard"),
+                                selected = noiseState.transparencyLevel == TransparencyLevel.REGULAR,
+                                onClick = { onTransparencyLevelChange(TransparencyLevel.REGULAR) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (1 in tLevels) {
+                            MiuixProfileChip(
+                                label = stringRes("device_settings_noise_reduction_transparent_person"),
+                                selected = noiseState.transparencyLevel == TransparencyLevel.VOCAL,
+                                onClick = { onTransparencyLevelChange(TransparencyLevel.VOCAL) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (2 in tLevels) {
+                            MiuixProfileChip(
+                                label = stringRes("device_settings_noise_reduction_transparent_environment"),
+                                selected = noiseState.transparencyLevel == TransparencyLevel.AMBIENT,
+                                onClick = { onTransparencyLevelChange(TransparencyLevel.AMBIENT) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -299,14 +351,20 @@ private fun MiuixNoiseRadioItem(
 @Composable
 private fun MiuixLevelDotView(
     currentLevel: AncLevel,
+    supportedGears: List<Int> = listOf(1, 0, 2),
     onLevelSelected: (AncLevel) -> Unit
 ) {
-    val levels = listOf(AncLevel.LIGHT, AncLevel.BALANCED, AncLevel.DEEP)
-    val selectedIndex = when (currentLevel) {
-        AncLevel.LIGHT -> 0
-        AncLevel.BALANCED -> 1
-        else -> 2
-    }
+    val levels = supportedGears.map { gear ->
+        when (gear) {
+            1 -> AncLevel.LIGHT
+            0 -> AncLevel.BALANCED
+            2 -> AncLevel.DEEP
+            4 -> AncLevel.ANTIWIND
+            else -> AncLevel.BALANCED
+        }
+    }.ifEmpty { listOf(AncLevel.LIGHT, AncLevel.BALANCED, AncLevel.DEEP) }
+
+    val selectedIndex = levels.indexOf(currentLevel).coerceAtLeast(0)
 
     Row(
         modifier = Modifier

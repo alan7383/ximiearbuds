@@ -17,24 +17,34 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.alan.ximiearbuds.core.device.DeviceRegistry
 import com.alan.ximiearbuds.core.device.EarbudsController
 import com.alan.ximiearbuds.core.protocol.EarbudGestures
 import com.alan.ximiearbuds.core.protocol.GestureAction
 import com.alan.ximiearbuds.core.protocol.GestureSettings
+import com.alan.ximiearbuds.core.protocol.OfficialFunctionIds
 import com.alan.ximiearbuds.ui.components.MiuixTopAppBar
 import com.alan.ximiearbuds.ui.components.XiaomiActionItem
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
 import com.alan.ximiearbuds.ui.components.XiaomiItemDivider
 import com.alan.ximiearbuds.ui.theme.stringRes
 
+data class GestureEditTarget(
+    val isLeft: Boolean,
+    val gestureType: String,
+    val funcId: Int,
+    val titleKey: String
+)
+
 /**
  * 1:1 replica of Xiaomi Earbuds `device_settings_fragment_gesture.xml`.
  * 
- * Replaces popup dialog with an authentic full-screen MIUI fragment:
- * - Top navigation bar with back chevron
- * - Segmented tabs for Left Earbud and Right Earbud
- * - Tap triggers: Single tap, Double tap, Triple tap, Long press, Stem slide
- * - Modal bottom sheet or action selector for gesture mapping
+ * Authentic single vertical layout displaying all trigger operations dynamically adapted
+ * to each earbud model's physical gesture capabilities:
+ * - Pinch gestures (Press once / Press twice / Press triple / Long press)
+ * - Tap gestures (Double tap / Triple tap / Long press)
+ * - Slide gestures (Slide up/down)
+ * - Allowed actions dynamically filtered per model and gesture trigger
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,12 +53,27 @@ fun MiuixGestureScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val activeModel by controller.activeModel.collectAsState()
+    val model = activeModel ?: DeviceRegistry.GENERIC_MODEL
+    val gestureCaps = model.gestureCapabilities
     val gestureSettings by controller.gestures.collectAsState()
-    var selectedEar by remember { mutableStateOf(0) } // 0 = Left, 1 = Right
-    var editingGestureType by remember { mutableStateOf<String?>(null) } // "single", "double", "triple", "long", "slide"
-
-    val currentGestures = if (selectedEar == 0) gestureSettings.left else gestureSettings.right
+    var editingTarget by remember { mutableStateOf<GestureEditTarget?>(null) }
     val scrollState = rememberScrollState()
+
+    val hasFunctions = model.supportedFunctionIds.isNotEmpty()
+    val isPinch = gestureCaps.isPinchGesture || model.hasFunction(OfficialFunctionIds.FUNC_GESTURE_PRESS_TWICE) || model.hasFunction(OfficialFunctionIds.FUNC_DOUBLE_MFB)
+    val showSinglePress = isPinch || model.hasFunction(OfficialFunctionIds.FUNC_GESTURE_PRESS_ONCE) || model.hasFunction(OfficialFunctionIds.FUNC_ONCE_MFB)
+    val showDoubleClick = !hasFunctions || isPinch || model.hasFunction(OfficialFunctionIds.FUNC_GESTURE_DOUBLE_CLICK) || model.hasFunction(OfficialFunctionIds.FUNC_GESTURE_PRESS_TWICE) || model.hasFunction(OfficialFunctionIds.FUNC_DOUBLE_MFB)
+    val showTripleClick = !hasFunctions || isPinch || model.hasFunction(OfficialFunctionIds.FUNC_GESTURE_TRIPLE_CLICK) || model.hasFunction(OfficialFunctionIds.FUNC_GESTURE_PRESS_TRIPLE) || model.hasFunction(OfficialFunctionIds.FUNC_TRIPLE_MFB)
+    val showLongPress = !hasFunctions || model.hasFunction(OfficialFunctionIds.FUNC_GESTURE_LONG_PRESS) || model.hasFunction(OfficialFunctionIds.FUNC_LONG_PRESS_MFB)
+    val showSlide = gestureCaps.isSlideGesture || model.hasFunction(OfficialFunctionIds.FUNC_GESTURE_SLIDE)
+
+    // Function IDs for action filtering
+    val singleFuncId = if (isPinch) OfficialFunctionIds.FUNC_GESTURE_PRESS_ONCE else OfficialFunctionIds.FUNC_GESTURE_PRESS_ONCE
+    val doubleFuncId = if (isPinch) OfficialFunctionIds.FUNC_GESTURE_PRESS_TWICE else OfficialFunctionIds.FUNC_GESTURE_DOUBLE_CLICK
+    val tripleFuncId = if (isPinch) OfficialFunctionIds.FUNC_GESTURE_PRESS_TRIPLE else OfficialFunctionIds.FUNC_GESTURE_TRIPLE_CLICK
+    val longFuncId = OfficialFunctionIds.FUNC_GESTURE_LONG_PRESS
+    val slideFuncId = OfficialFunctionIds.FUNC_GESTURE_SLIDE
 
     Column(
         modifier = modifier
@@ -66,121 +91,106 @@ fun MiuixGestureScreen(
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(scrollState)
-                .padding(bottom = 24.dp)
+                .padding(vertical = 12.dp, horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Segmented Tab for Left / Right Earbud
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .padding(4.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (selectedEar == 0) Color(0xFF007AFF) else Color.Transparent)
-                            .clickable { selectedEar = 0 }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringRes("device_settings_find_side_left"),
-                            color = if (selectedEar == 0) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                            fontWeight = if (selectedEar == 0) FontWeight.SemiBold else FontWeight.Normal,
-                            fontSize = 13.sp
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (selectedEar == 1) Color(0xFF007AFF) else Color.Transparent)
-                            .clickable { selectedEar = 1 }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringRes("device_settings_find_side_right"),
-                            color = if (selectedEar == 1) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                            fontWeight = if (selectedEar == 1) FontWeight.SemiBold else FontWeight.Normal,
-                            fontSize = 13.sp
-                        )
-                    }
+            // 1. Single Press / Pinch Once (if supported or pinch device)
+            if (showSinglePress) {
+                val leftTitle = if (isPinch) "device_settings_left_press_once" else "device_settings_left_click"
+                val rightTitle = if (isPinch) "device_settings_right_press_once" else "device_settings_right_click"
+                XiaomiCardContainer {
+                    XiaomiActionItem(
+                        title = stringRes(leftTitle),
+                        subtitle = formatGestureAction(gestureSettings.left.singleTap),
+                        onClick = { editingTarget = GestureEditTarget(true, "single", singleFuncId, leftTitle) }
+                    )
+                    XiaomiItemDivider()
+                    XiaomiActionItem(
+                        title = stringRes(rightTitle),
+                        subtitle = formatGestureAction(gestureSettings.right.singleTap),
+                        onClick = { editingTarget = GestureEditTarget(false, "single", singleFuncId, rightTitle) }
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            // 2. Double Tap / Press Twice
+            if (showDoubleClick) {
+                val leftTitle = if (isPinch) "device_settings_left_press_twice" else "device_settings_left_double_click"
+                val rightTitle = if (isPinch) "device_settings_right_press_twice" else "device_settings_right_double_click"
+                XiaomiCardContainer {
+                    XiaomiActionItem(
+                        title = stringRes(leftTitle),
+                        subtitle = formatGestureAction(gestureSettings.left.doubleTap),
+                        onClick = { editingTarget = GestureEditTarget(true, "double", doubleFuncId, leftTitle) }
+                    )
+                    XiaomiItemDivider()
+                    XiaomiActionItem(
+                        title = stringRes(rightTitle),
+                        subtitle = formatGestureAction(gestureSettings.right.doubleTap),
+                        onClick = { editingTarget = GestureEditTarget(false, "double", doubleFuncId, rightTitle) }
+                    )
+                }
+            }
 
-            // Section Header: Actions au toucher
-            Text(
-                text = stringRes("device_settings_gesture_operation").uppercase(),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 11.sp,
-                    letterSpacing = 0.5.sp
-                ),
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
-            )
+            // 3. Triple Tap / Press Triple
+            if (showTripleClick) {
+                val leftTitle = if (isPinch) "device_settings_left_press_triple" else "device_settings_left_triple_click"
+                val rightTitle = if (isPinch) "device_settings_right_press_triple" else "device_settings_right_triple_click"
+                XiaomiCardContainer {
+                    XiaomiActionItem(
+                        title = stringRes(leftTitle),
+                        subtitle = formatGestureAction(gestureSettings.left.tripleTap),
+                        onClick = { editingTarget = GestureEditTarget(true, "triple", tripleFuncId, leftTitle) }
+                    )
+                    XiaomiItemDivider()
+                    XiaomiActionItem(
+                        title = stringRes(rightTitle),
+                        subtitle = formatGestureAction(gestureSettings.right.tripleTap),
+                        onClick = { editingTarget = GestureEditTarget(false, "triple", tripleFuncId, rightTitle) }
+                    )
+                }
+            }
 
-            // Card Group with all gestures
-            XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
-                // Single Tap
-                XiaomiActionItem(
-                    title = stringRes("device_settings_once_click_mbf"),
-                    subtitle = formatGestureAction(currentGestures.singleTap),
-                    onClick = { editingGestureType = "single" }
-                )
+            // 4. Long Press
+            if (showLongPress) {
+                XiaomiCardContainer {
+                    XiaomiActionItem(
+                        title = stringRes("device_settings_left_long_press"),
+                        subtitle = formatGestureAction(gestureSettings.left.longPress),
+                        onClick = { editingTarget = GestureEditTarget(true, "long", longFuncId, "device_settings_left_long_press") }
+                    )
+                    XiaomiItemDivider()
+                    XiaomiActionItem(
+                        title = stringRes("device_settings_right_long_press"),
+                        subtitle = formatGestureAction(gestureSettings.right.longPress),
+                        onClick = { editingTarget = GestureEditTarget(false, "long", longFuncId, "device_settings_right_long_press") }
+                    )
+                }
+            }
 
-                XiaomiItemDivider()
-
-                // Double Tap
-                XiaomiActionItem(
-                    title = stringRes("device_settings_double_click_mbf"),
-                    subtitle = formatGestureAction(currentGestures.doubleTap),
-                    onClick = { editingGestureType = "double" }
-                )
-
-                XiaomiItemDivider()
-
-                // Triple Tap
-                XiaomiActionItem(
-                    title = stringRes("device_settings_triple_strike_mbf"),
-                    subtitle = formatGestureAction(currentGestures.tripleTap),
-                    onClick = { editingGestureType = "triple" }
-                )
-
-                XiaomiItemDivider()
-
-                // Long Press
-                XiaomiActionItem(
-                    title = stringRes("device_settings_long_press_mbf_two_seconds"),
-                    subtitle = formatGestureAction(currentGestures.longPress),
-                    onClick = { editingGestureType = "long" }
-                )
-
-                XiaomiItemDivider()
-
-                // Slide / Stem gesture
-                XiaomiActionItem(
-                    title = stringRes("device_settings_volume_changed"),
-                    subtitle = formatGestureAction(currentGestures.slide),
-                    onClick = { editingGestureType = "slide" }
-                )
+            // 5. Slide
+            if (showSlide) {
+                XiaomiCardContainer {
+                    XiaomiActionItem(
+                        title = stringRes("device_settings_left_slide"),
+                        subtitle = formatGestureAction(gestureSettings.left.slide),
+                        onClick = { editingTarget = GestureEditTarget(true, "slide", slideFuncId, "device_settings_left_slide") }
+                    )
+                    XiaomiItemDivider()
+                    XiaomiActionItem(
+                        title = stringRes("device_settings_right_slide"),
+                        subtitle = formatGestureAction(gestureSettings.right.slide),
+                        onClick = { editingTarget = GestureEditTarget(false, "slide", slideFuncId, "device_settings_right_slide") }
+                    )
+                }
             }
         }
     }
 
     // Modal Bottom Sheet to choose gesture action
-    editingGestureType?.let { gestureType ->
+    editingTarget?.let { target ->
         ModalBottomSheet(
-            onDismissRequest = { editingGestureType = null },
+            onDismissRequest = { editingTarget = null },
             sheetState = rememberModalBottomSheetState()
         ) {
             Column(
@@ -189,16 +199,8 @@ fun MiuixGestureScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .padding(bottom = 32.dp)
             ) {
-                val actionTitle = when (gestureType) {
-                    "single" -> stringRes("device_settings_once_click_mbf")
-                    "double" -> stringRes("device_settings_double_click_mbf")
-                    "triple" -> stringRes("device_settings_triple_strike_mbf")
-                    "long" -> stringRes("device_settings_long_press_mbf_two_seconds")
-                    else -> stringRes("device_settings_volume_changed")
-                }
-
                 Text(
-                    text = actionTitle,
+                    text = stringRes(target.titleKey),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
@@ -206,27 +208,38 @@ fun MiuixGestureScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val actions = listOf(
-                    GestureAction.PLAY_PAUSE to stringRes("device_settings_play_or_pause"),
-                    GestureAction.NEXT_TRACK to stringRes("device_settings_next_song"),
-                    GestureAction.PREV_TRACK to stringRes("device_settings_last_song"),
-                    GestureAction.NOISE_CONTROL to stringRes("device_settings_noise_control"),
-                    GestureAction.VOLUME_UP to stringRes("device_settings_volume_up"),
-                    GestureAction.VOLUME_DOWN to stringRes("device_settings_volume_down"),
-                    GestureAction.VOICE_ASSISTANT to stringRes("device_settings_awake_voice_assistant"),
-                    GestureAction.NONE to stringRes("device_settings_click_cancle")
-                )
-
-                val currentAction = when (gestureType) {
-                    "single" -> currentGestures.singleTap
-                    "double" -> currentGestures.doubleTap
-                    "triple" -> currentGestures.tripleTap
-                    "long" -> currentGestures.longPress
-                    else -> currentGestures.slide
+                val allowedActionIds = gestureCaps.allowedActions[target.funcId]
+                val actions: List<GestureAction> = remember(target, allowedActionIds) {
+                    if (!allowedActionIds.isNullOrEmpty()) {
+                        allowedActionIds.map { actionId ->
+                            GestureAction.fromId(actionId)
+                        }
+                    } else {
+                        listOf(
+                            GestureAction.PLAY_PAUSE,
+                            GestureAction.NEXT_TRACK,
+                            GestureAction.PREV_TRACK,
+                            GestureAction.NOISE_CONTROL,
+                            GestureAction.VOLUME_UP,
+                            GestureAction.VOLUME_DOWN,
+                            GestureAction.VOICE_ASSISTANT,
+                            GestureAction.NONE
+                        )
+                    }
                 }
 
-                for ((act, label) in actions) {
+                val earGestures = if (target.isLeft) gestureSettings.left else gestureSettings.right
+                val currentAction = when (target.gestureType) {
+                    "single" -> earGestures.singleTap
+                    "double" -> earGestures.doubleTap
+                    "triple" -> earGestures.tripleTap
+                    "long" -> earGestures.longPress
+                    else -> earGestures.slide
+                }
+
+                for (act in actions) {
                     val isCurrent = currentAction == act
+                    val label = formatGestureAction(act)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -234,11 +247,11 @@ fun MiuixGestureScreen(
                             .clickable {
                                 updateEarbudGesture(
                                     controller = controller,
-                                    isLeft = selectedEar == 0,
-                                    type = gestureType,
+                                    isLeft = target.isLeft,
+                                    type = target.gestureType,
                                     newAction = act
                                 )
-                                editingGestureType = null
+                                editingTarget = null
                             }
                             .padding(horizontal = 12.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -294,15 +307,5 @@ private fun updateEarbudGesture(
 
 @Composable
 private fun formatGestureAction(action: GestureAction): String {
-    return when (action) {
-        GestureAction.PLAY_PAUSE -> stringRes("device_settings_play_or_pause")
-        GestureAction.NEXT_TRACK -> stringRes("device_settings_next_song")
-        GestureAction.PREV_TRACK -> stringRes("device_settings_last_song")
-        GestureAction.NOISE_CONTROL -> stringRes("device_settings_noise_control")
-        GestureAction.VOLUME_UP -> stringRes("device_settings_volume_up")
-        GestureAction.VOLUME_DOWN -> stringRes("device_settings_volume_down")
-        GestureAction.VOICE_ASSISTANT -> stringRes("device_settings_awake_voice_assistant")
-        GestureAction.NONE -> stringRes("device_settings_click_cancle")
-        else -> stringRes("device_settings_others")
-    }
+    return stringRes(action.stringKey)
 }

@@ -21,7 +21,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.alan.ximiearbuds.core.device.DeviceRegistry
 import com.alan.ximiearbuds.core.device.EarbudsController
+import com.alan.ximiearbuds.core.protocol.OfficialFunctionIds
 import com.alan.ximiearbuds.core.protocol.OfficialPayloadCodecs
 import com.alan.ximiearbuds.ui.components.MiuixTopAppBar
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
@@ -30,7 +32,12 @@ import com.alan.ximiearbuds.ui.theme.*
 
 /**
  * 1:1 authentic reproduction of `device_settings_activity_spatial_audio.xml`
- * (com.mi.earphone.settings.ui.spatialaudio.PersonalAudioFragment).
+ * (com.mi.earphone.settings.ui.spatialaudio.SpatialAudioActivity).
+ *
+ * Adapts dynamically to earbud model capabilities:
+ * - Head tracking switch (FUNC_SOUND_SETTING_SPATIAL_AUDIO_HEAD_TRACKING / 2004)
+ * - Immersive sound prompts (FUNC_SOUND_SETTINGS_SPATIAL_AUDIO_NOTIFY / 2007)
+ * - Scene rendering modes (FUNC_SOUND_EFFECT_RENDERING / 2009 with dynamic scene filter)
  */
 @Composable
 fun MiuixSpatialAudioScreen(
@@ -38,8 +45,31 @@ fun MiuixSpatialAudioScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val activeModel by controller.activeModel.collectAsState()
+    val model = activeModel ?: DeviceRegistry.GENERIC_MODEL
+    val soundCaps = model.soundCapabilities
     val spatialState by controller.spatialAudioConfig.collectAsState()
     val scrollState = rememberScrollState()
+
+    val hasFunctions = model.supportedFunctionIds.isNotEmpty()
+    val showHeadTracking = if (hasFunctions) model.hasFunction(OfficialFunctionIds.FUNC_SOUND_SETTING_SPATIAL_AUDIO_HEAD_TRACKING) || soundCaps.hasHeadTracking else true
+    val showNotifySound = if (hasFunctions) model.hasFunction(OfficialFunctionIds.FUNC_SOUND_SETTINGS_SPATIAL_AUDIO_NOTIFY) || model.hasFunction(OfficialFunctionIds.FUNC_SOUND_SETTING_CLOSE_SPATIAL_AUDIO) else true
+    val showSceneRendering = if (hasFunctions) model.hasFunction(OfficialFunctionIds.FUNC_SOUND_EFFECT_RENDERING) || soundCaps.spatialScenes.isNotEmpty() else true
+
+    val allScenes = listOf(
+        1 to stringRes("device_settings_scene_standard"),
+        2 to stringRes("device_settings_scene_music"),
+        3 to stringRes("device_settings_scene_video"),
+        4 to stringRes("device_settings_scene_game"),
+        5 to stringRes("device_settings_scene_audio_book")
+    )
+    val scenes = remember(soundCaps) {
+        if (soundCaps.spatialScenes.isNotEmpty()) {
+            allScenes.filter { it.first in soundCaps.spatialScenes }
+        } else {
+            allScenes
+        }
+    }
 
     // Smooth head orientation simulation pulse
     val infiniteTransition = rememberInfiniteTransition(label = "spatialPulse")
@@ -138,81 +168,85 @@ fun MiuixSpatialAudioScreen(
                 }
 
                 if (spatialState.isOpen) {
-                    XiaomiItemDivider()
-
                     // Head Tracking Switch
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringRes("device_settings_spatial_audio_head_tracking"),
-                                color = XiaomiTextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = stringRes("device_settings_spatial_audio_head_tracking_desc"),
-                                color = XiaomiTextSecondary,
-                                fontSize = 12.sp,
-                                lineHeight = 16.sp
+                    if (showHeadTracking) {
+                        XiaomiItemDivider()
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringRes("device_settings_spatial_audio_head_tracking"),
+                                    color = XiaomiTextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = stringRes("device_settings_spatial_audio_head_tracking_desc"),
+                                    color = XiaomiTextSecondary,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            Switch(
+                                checked = spatialState.headTracking,
+                                onCheckedChange = { checked ->
+                                    controller.setSpatialAudioFull(spatialState.copy(headTracking = checked))
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = XiaomiCyan
+                                )
                             )
                         }
-                        Switch(
-                            checked = spatialState.headTracking,
-                            onCheckedChange = { checked ->
-                                controller.setSpatialAudioFull(spatialState.copy(headTracking = checked))
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = XiaomiCyan
-                            )
-                        )
                     }
 
-                    XiaomiItemDivider()
-
                     // Notification Sound Switch
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringRes("device_settings_spatial_audio_notify_sound"),
-                                color = XiaomiTextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = stringRes("device_settings_spatial_audio_notify_sound_title"),
-                                color = XiaomiTextSecondary,
-                                fontSize = 12.sp
+                    if (showNotifySound) {
+                        XiaomiItemDivider()
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringRes("device_settings_spatial_audio_notify_sound"),
+                                    color = XiaomiTextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = stringRes("device_settings_spatial_audio_notify_sound_title"),
+                                    color = XiaomiTextSecondary,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Switch(
+                                checked = spatialState.virtualSurround,
+                                onCheckedChange = { checked ->
+                                    controller.setSpatialAudioFull(spatialState.copy(virtualSurround = checked))
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = XiaomiCyan
+                                )
                             )
                         }
-                        Switch(
-                            checked = spatialState.virtualSurround,
-                            onCheckedChange = { checked ->
-                                controller.setSpatialAudioFull(spatialState.copy(virtualSurround = checked))
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = XiaomiCyan
-                            )
-                        )
                     }
                 }
             }
 
-            // Group 2: Scene Rendering Modes (if Spatial Audio is open)
-            if (spatialState.isOpen) {
+            // Group 2: Scene Rendering Modes (if Spatial Audio is open and supported)
+            if (spatialState.isOpen && showSceneRendering && scenes.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = stringRes("device_settings_scene_rendering"),
@@ -223,13 +257,6 @@ fun MiuixSpatialAudioScreen(
                     )
 
                     XiaomiCardContainer {
-                        val scenes = listOf(
-                            0 to stringRes("device_settings_spatial_audio_default"),
-                            1 to stringRes("device_settings_spatial_audio_theater"),
-                            2 to stringRes("device_settings_spatial_audio_game"),
-                            3 to stringRes("device_settings_spatial_audio_music")
-                        )
-
                         scenes.forEachIndexed { index, (modeId, modeTitle) ->
                             val isSelected = spatialState.sceneRenderingMode == modeId
                             Row(

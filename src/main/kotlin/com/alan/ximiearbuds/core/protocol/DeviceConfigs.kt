@@ -7,6 +7,104 @@ import java.nio.charset.StandardCharsets
  * Reverse-engineered from DeviceConfigIdConstantKt, BaseDeviceConfigKt,
  * DeviceConfigNoiseLevel, DeviceConfigCustomEq, DeviceConfigClickSet, and f7.f.
  */
+object OfficialGroupIds {
+    const val GROUP_NOISE = 1
+    const val GROUP_VOICE = 2
+    const val GROUP_FUNCTION_SETTING = 3
+    const val GROUP_GESTURE_SETTING = 4
+    const val GROUP_NORMAL = 5
+    const val GROUP_LABORATORY = 6
+    const val GROUP_USB = 7
+    const val GROUP_SPORT = 8
+}
+
+object OfficialFunctionIds {
+    // Group 1: Noise
+    const val FUNC_ANC_SWITCH = 1001
+    const val FUNC_ANC_NOISE_THREE = 1002
+    const val FUNC_ANC_NOISE_SIX = 1003
+    const val FUNC_ANC_TRANSPARENT_TWO = 1004
+    const val FUNC_ANC_TRANSPARENT_THREE = 1005
+    const val FUNC_ANC_NOISE_FOUR = 1006
+    const val FUNC_ANC_NOISE_TWO = 1007
+    const val FUNC_SMART_NOISE_REDUCTION = 1008
+    const val FUNC_NOISE_IMMERSE = 1009
+
+    // Group 2: Sound & EQ
+    const val FUNC_SOUND_SETTING_VIRTUAL_SURROUND = 2001
+    const val FUNC_SOUND_SETTING_CLOSE_SPATIAL_AUDIO = 2002
+    const val FUNC_SOUND_SETTING_SPATIAL_AUDIO_PREFERENCE = 2003
+    const val FUNC_SOUND_SETTING_SPATIAL_AUDIO_HEAD_TRACKING = 2004
+    const val FUNC_SOUND_SETTING_SPATIAL_AUDIO_VIRTUAL_SURROUND = 2005
+    const val FUNC_SOUND_SETTINGS_SOUND_MODE = 2006
+    const val FUNC_SOUND_SETTINGS_SPATIAL_AUDIO_NOTIFY = 2007
+    const val FUNC_SOUND_SETTINGS_ADAPTIVE_SENSE = 2008
+    const val FUNC_SOUND_EFFECT_RENDERING = 2009
+    const val FUNC_SOUND_SETTINGS_SOUND_MODE_OTA = 2016
+    const val FUNC_SOUND_SETTINGS_ADAPTIVE_VOLUME = 2017
+    const val FUNC_PERSONAL_SPATIAL_AUDIO = 2018
+    const val FUNC_AUDIBILITY_ADAPTATION = 2019
+    const val FUNC_AUDIO_MODE = 2020
+    const val FUNC_NOTIFICATION_VOLUME = 2021
+
+    // Group 3: Function Settings
+    const val FUNC_SMART_FREE_PICK = 3001
+    const val FUNC_WEAR_DETECTION = 3002
+    const val FUNC_FIT_DETECT = 3003
+    const val FUNC_DUAL_DEVICE_CONNECTION = 3004
+    const val FUNC_VOICE_CONTROL = 3005
+    const val FUNC_HEARING_HEALTH = 3006
+    const val FUNC_NOTIFICATION = 3007
+    const val FUNC_AUTO_PICK_CALL = 3008
+    const val FUNC_AUTO_GAMING_MODE = 3009
+    const val FUNC_CUSTOM_SKIN = 3010
+    const val FUNC_LOW_LATENCY = 3011
+    const val FUNC_PERSONALIZED_NOISE_REDUCTION = 3012
+    const val FUNC_EAR_CANAL_DETECTION = 3013
+    const val FUNC_NOTIFICATION_TTS = 3014
+    const val FUNC_EARBOX_SOUND = 3015
+
+    // Group 4: Gestures
+    const val FUNC_GESTURE_DOUBLE_CLICK = 4001
+    const val FUNC_GESTURE_TRIPLE_CLICK = 4002
+    const val FUNC_GESTURE_LONG_PRESS = 4003
+    const val FUNC_GESTURE_PRESS_TWICE = 4004
+    const val FUNC_GESTURE_PRESS_TRIPLE = 4005
+    const val FUNC_GESTURE_PRESS_ONCE = 4006
+    const val FUNC_GESTURE_SLIDE = 4011
+    const val FUNC_DOUBLE_MFB = 4012
+    const val FUNC_TRIPLE_MFB = 4013
+    const val FUNC_LONG_PRESS_MFB = 4014
+    const val FUNC_LONG_PRESS_REDUCE = 4015
+    const val FUNC_LONG_PRESS_MFB_AND_REDUCE = 4016
+    const val FUNC_LONG_PRESS_ADD_AND_REDUCE = 4017
+    const val FUNC_ONCE_MFB = 4018
+
+    // Group 5: Device Management
+    const val FUNC_FIND_DEVICE = 5001
+    const val FUNC_DEVICE_INTRODUCE = 5002
+    const val FUNC_DEVICE_RECORD = 5003
+    const val FUNC_FIRMWARE_UPDATE = 5004
+    const val FUNC_BEGINNER_GUIDE = 5005
+    const val FUNC_EXERCISE_REPORT = 5006
+    const val FUNC_DEVICE_TRANSLATE = 5008
+    const val SUPER_AI = 5009
+
+    // Group 6: Laboratory
+    const val FUNC_LABORATORY_NOISE = 6001
+    const val FUNC_LABORATORY_WEAR_DETECTION = 6002
+
+    // Group 7: USB / Dongle
+    const val FUNC_USB_MODE = 7001
+    const val FUNC_USB_EAR_MONITOR = 7002
+    const val FUNC_USB_CLICK = 7003
+    const val FUNC_USB_DOUBLE_CLICK = 7004
+    const val FUNC_USB_LONG_PRESS = 7005
+
+    // Group 8: Sports / Bone Conduction
+    const val FUNC_SWIM_LENGTH = 8001
+}
+
 object ConfigId {
     const val CONFIG_AUDIO_MODE = 1
     const val CONFIG_CUSTOM_CLICK = 2
@@ -128,11 +226,11 @@ data class TargetDeviceInfo(
                     1 -> { // Version
                         if (valueLen >= 2) {
                             versionCode = ((data[valOffset].toInt() and 0xFF) shl 8) or (data[valOffset + 1].toInt() and 0xFF)
-                            versionName = "%d.%d.%d".format(
-                                (data[valOffset].toInt() and 0xF0) ushr 4,
-                                data[valOffset].toInt() and 0x0F,
-                                data[valOffset + 1].toInt() and 0xFF
-                            )
+                            val v1 = (data[valOffset].toInt() and 0xF0) ushr 4
+                            val v2 = data[valOffset].toInt() and 0x0F
+                            val v3 = (data[valOffset + 1].toInt() and 0xF0) ushr 4
+                            val v4 = data[valOffset + 1].toInt() and 0x0F
+                            versionName = "$v1.$v2.$v3.$v4"
                         }
                     }
                     3 -> { // VID & PID
@@ -331,14 +429,18 @@ data class NoiseControlState(
 
         fun fromCommonConfig(config: CommonConfig, currentState: NoiseControlState = NoiseControlState()): NoiseControlState? {
             return when (config.type) {
-                ConfigId.NOISE_LEVEL_CHOOSE -> {
-                    if (config.value.size >= 2) {
+                ConfigId.NOISE_LEVEL_CHOOSE, ConfigId.CONFIG_AUDIO_MODE -> {
+                    if (config.value.isNotEmpty()) {
                         val mode = NoiseMode.fromId(config.value[0].toInt() and 0xFF)
-                        val level = config.value[1].toInt() and 0xFF
-                        when (mode) {
-                            NoiseMode.ANC -> currentState.copy(mode = mode, ancLevel = AncLevel.fromId(level))
-                            NoiseMode.TRANSPARENCY -> currentState.copy(mode = mode, transparencyLevel = TransparencyLevel.fromId(level))
-                            NoiseMode.OFF -> currentState.copy(mode = NoiseMode.OFF)
+                        if (config.value.size >= 2) {
+                            val level = config.value[1].toInt() and 0xFF
+                            when (mode) {
+                                NoiseMode.ANC -> currentState.copy(mode = mode, ancLevel = AncLevel.fromId(level), ancLevelIndex = level)
+                                NoiseMode.TRANSPARENCY -> currentState.copy(mode = mode, transparencyLevel = TransparencyLevel.fromId(level), transparencyLevelIndex = level)
+                                NoiseMode.OFF -> currentState.copy(mode = NoiseMode.OFF)
+                            }
+                        } else {
+                            currentState.copy(mode = mode)
                         }
                     } else null
                 }

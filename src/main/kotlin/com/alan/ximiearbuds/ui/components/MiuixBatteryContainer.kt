@@ -57,7 +57,7 @@ fun MiuixBatteryContainer(
         ) {
             // Left Earbud Column
             MiuixBatteryColumn(
-                label = stringRes("device_settings_find_side_left"),
+                label = stringRes("device_settings_left"),
                 percentage = if (deviceInfo.leftBattery.isConnected && deviceInfo.leftBattery.percentage >= 0) deviceInfo.leftBattery.percentage else null,
                 isCharging = deviceInfo.leftBattery.isCharging,
                 modifier = Modifier.weight(1f)
@@ -73,7 +73,7 @@ fun MiuixBatteryContainer(
 
             // Right Earbud Column
             MiuixBatteryColumn(
-                label = stringRes("device_settings_find_side_right"),
+                label = stringRes("device_settings_right"),
                 percentage = if (deviceInfo.rightBattery.isConnected && deviceInfo.rightBattery.percentage >= 0) deviceInfo.rightBattery.percentage else null,
                 isCharging = deviceInfo.rightBattery.isCharging,
                 modifier = Modifier.weight(1f)
