@@ -569,28 +569,48 @@ class EarbudsController(
         // Does NOT flood the device with unnecessary SET_DEVICE_CONFIG commands.
         periodicPollJob?.cancel()
         periodicPollJob = scope.launch {
+            var tickCount = 0
             while (isActive && _connectionState.value == ConnectionState.CONNECTED) {
-                delay(8000)
-                // 1. Poll Target Info (Battery & Firmware)
-                transport.send(
-                    RcspPacket(
-                        type = RcspPacket.TYPE_COMMAND,
-                        hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
-                        targetApp = RcspPacket.TARGET_APP_EARPHONE,
-                        opCode = RcspPacket.CMD_GET_TARGET_INFO,
-                        payload = byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte())
+                delay(2000)
+                tickCount++
+
+                // 1. If in Adaptive ANC mode, poll Config 11 every 2s to track ambient environment noise changes
+                if (_noiseControl.value.isAutoNoise && _noiseControl.value.mode == NoiseMode.ANC) {
+                    val batch = OfficialPayloadCodecs.GetDeviceConfigCodec.encode(listOf(ConfigId.NOISE_LEVEL_CHOOSE))
+                    transport.send(
+                        RcspPacket(
+                            type = RcspPacket.TYPE_COMMAND,
+                            hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
+                            targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                            opCode = RcspPacket.CMD_GET_DEVICE_CONFIG,
+                            payload = batch
+                        )
                     )
-                )
-                // 2. Poll Run Info (Live ANC mode & run status)
-                transport.send(
-                    RcspPacket(
-                        type = RcspPacket.TYPE_COMMAND,
-                        hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
-                        targetApp = RcspPacket.TARGET_APP_EARPHONE,
-                        opCode = RcspPacket.CMD_GET_DEVICE_RUN_INFO,
-                        payload = byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte())
+                }
+
+                // 2. Poll Target Info & Run Info every 8 seconds (every 4 ticks)
+                if (tickCount % 4 == 0) {
+                    // Poll Target Info (Battery & Firmware)
+                    transport.send(
+                        RcspPacket(
+                            type = RcspPacket.TYPE_COMMAND,
+                            hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
+                            targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                            opCode = RcspPacket.CMD_GET_TARGET_INFO,
+                            payload = byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte())
+                        )
                     )
-                )
+                    // Poll Run Info (Live ANC mode & run status)
+                    transport.send(
+                        RcspPacket(
+                            type = RcspPacket.TYPE_COMMAND,
+                            hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
+                            targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                            opCode = RcspPacket.CMD_GET_DEVICE_RUN_INFO,
+                            payload = byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte())
+                        )
+                    )
+                }
             }
         }
     }
@@ -951,16 +971,54 @@ class EarbudsController(
         sendNoiseLevel(NoiseMode.ANC.id, level.id)
     }
 
+    fun setAncRawLevel(rawLevel: Int) {
+        val updated = _noiseControl.value.copy(
+            mode = NoiseMode.ANC,
+            ancLevelIndex = rawLevel,
+            ancLevel = AncLevel.fromId(rawLevel)
+        )
+        _noiseControl.value = updated
+        sendNoiseLevel(NoiseMode.ANC.id, rawLevel)
+    }
+
     fun setTransparencyLevel(level: TransparencyLevel) {
         val updated = _noiseControl.value.copy(mode = NoiseMode.TRANSPARENCY, transparencyLevel = level, transparencyLevelIndex = level.id)
         _noiseControl.value = updated
         sendNoiseLevel(NoiseMode.TRANSPARENCY.id, level.id)
     }
 
+    fun setTransparencyRawLevel(rawLevel: Int) {
+        val updated = _noiseControl.value.copy(
+            mode = NoiseMode.TRANSPARENCY,
+            transparencyLevelIndex = rawLevel,
+            transparencyLevel = TransparencyLevel.fromId(rawLevel)
+        )
+        _noiseControl.value = updated
+        sendNoiseLevel(NoiseMode.TRANSPARENCY.id, rawLevel)
+    }
+
     fun setAutoNoise(enabled: Boolean) {
         val updated = _noiseControl.value.copy(isAutoNoise = enabled)
         _noiseControl.value = updated
         sendConfig(NoiseControlState.createAutoNoiseConfig(enabled))
+        if (enabled && updated.mode == NoiseMode.ANC) {
+            queryNoiseLevel()
+        }
+    }
+
+    fun queryNoiseLevel() {
+        scope.launch {
+            val payload = OfficialPayloadCodecs.GetDeviceConfigCodec.encode(listOf(ConfigId.NOISE_LEVEL_CHOOSE))
+            transport.send(
+                RcspPacket(
+                    type = RcspPacket.TYPE_COMMAND,
+                    hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
+                    targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                    opCode = RcspPacket.CMD_GET_DEVICE_CONFIG,
+                    payload = payload
+                )
+            )
+        }
     }
 
     fun setSmartDenoise(enabled: Boolean) {

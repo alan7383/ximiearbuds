@@ -391,8 +391,8 @@ data class NoiseControlState(
     fun toCommonConfig(): CommonConfig {
         val levelByte = when (mode) {
             NoiseMode.OFF -> 0
-            NoiseMode.ANC -> ancLevel.id
-            NoiseMode.TRANSPARENCY -> transparencyLevel.id
+            NoiseMode.ANC -> ancLevelIndex
+            NoiseMode.TRANSPARENCY -> transparencyLevelIndex
         }
         return CommonConfig(
             type = ConfigId.NOISE_LEVEL_CHOOSE,

@@ -62,6 +62,23 @@ class OfficialViewModelLogicTest {
         assertEquals(2, controller.noiseControl.value.ancLevelIndex)
         assertEquals(AncLevel.DEEP, controller.noiseControl.value.ancLevel)
 
+        // Test Continuous 20-gear ANC raw level (e.g. level 15 for Redmi Buds 6 Pro)
+        controller.setAncRawLevel(15)
+        assertEquals(NoiseMode.ANC, controller.noiseControl.value.mode)
+        assertEquals(15, controller.noiseControl.value.ancLevelIndex)
+        val config11 = controller.noiseControl.value.toCommonConfig()
+        assertEquals(ConfigId.NOISE_LEVEL_CHOOSE, config11.type)
+        assertEquals(1, config11.value[0].toInt()) // Mode ANC = 1
+        assertEquals(15, config11.value[1].toInt()) // Level = 15
+
+        // Test fromCommonConfig decoding Config 11
+        val parsedState = NoiseControlState.fromCommonConfig(
+            CommonConfig(ConfigId.NOISE_LEVEL_CHOOSE, byteArrayOf(1, 18)),
+            controller.noiseControl.value
+        )
+        assertNotNull(parsedState)
+        assertEquals(18, parsedState!!.ancLevelIndex)
+
         controller.setTransparencyLevelByIndex(1, 1)
         assertEquals(NoiseMode.TRANSPARENCY, controller.noiseControl.value.mode)
         assertEquals(1, controller.noiseControl.value.transparencyLevelIndex)

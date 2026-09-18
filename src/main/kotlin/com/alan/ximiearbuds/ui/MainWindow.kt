@@ -331,8 +331,9 @@ fun MainWindow(
                                             noiseState = noiseControl,
                                             capabilities = currentModel.ancCapabilities,
                                             onModeChange = { controller.setNoiseMode(it) },
-                                            onAncLevelChange = { controller.setAncLevel(it) },
-                                            onTransparencyLevelChange = { controller.setTransparencyLevel(it) },
+                                            onAncLevelChange = { controller.setAncRawLevel(it) },
+                                            onTransparencyLevelChange = { controller.setTransparencyRawLevel(it) },
+                                            onAdaptiveAncChange = { controller.setAutoNoise(it) },
                                             onSmartDenoiseChange = { controller.setSmartDenoise(it) },
                                             onPersonalizedAncChange = { controller.setPersonalizedNoiseReduction(it) }
                                         )
