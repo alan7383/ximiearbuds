@@ -267,14 +267,17 @@ fun MainWindow(
                                         ) {
                                             Text(
                                                 text = stringRes("device_settings_show_all_device"),
-                                                color = XiaomiTextSecondary,
+                                                color = if (isDarkTheme) XiaomiTextSecondary else XiaomiLightTextSecondary,
                                                 fontSize = 14.sp
                                             )
-                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Spacer(modifier = Modifier.width(5.dp))
                                             Image(
-                                                painter = painterResource("drawable/device_settings_drawable_end_all_devices.png"),
+                                                painter = painterResource(
+                                                    if (isDarkTheme) "drawable/device_settings_drawable_end_all_devices_night.png"
+                                                    else "drawable/device_settings_drawable_end_all_devices.png"
+                                                ),
                                                 contentDescription = null,
-                                                modifier = Modifier.size(10.dp)
+                                                modifier = Modifier.height(10.dp)
                                             )
                                         }
                                     }
