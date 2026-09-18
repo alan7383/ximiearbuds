@@ -282,29 +282,31 @@ fun MainWindow(
                                         }
                                     }
 
-                                    // add_device_iv: @drawable/device_setting_add_device
-                                    IconButton(
-                                        onClick = { currentScreen = AppScreen.ADD_DEVICE },
-                                        modifier = Modifier.size(36.dp)
+                                    // Right action buttons (aligned with device_name_tv in device_settings_layout_setting_header.xml)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        // add_device_iv: @drawable/device_setting_add_device (wrap_content = 100px/3 = 33.3dp, inner visible + is 21.3dp)
                                         Image(
                                             painter = painterResource(
                                                 if (isDarkTheme) "drawable/device_setting_add_device_night.webp"
                                                 else "drawable/device_setting_add_device.webp"
                                             ),
                                             contentDescription = stringRes("device_add_title"),
-                                            modifier = Modifier.size(24.dp)
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(CircleShape)
+                                                .clickable { currentScreen = AppScreen.ADD_DEVICE }
+                                        )
+
+                                        Spacer(modifier = Modifier.width(20.dp))
+
+                                        // user_avatar_iv: @drawable/avatar_default, 22dp circle
+                                        MiuixUserAvatar(
+                                            size = 22.dp,
+                                            onClick = { navStack.add(ScreenDestination.Profile) }
                                         )
                                     }
-
-                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                    // user_avatar_iv: @drawable/avatar_default, 22dp circle (MineApiKt.getMineApi().startMinePage())
-                                    MiuixUserAvatar(
-                                        size = 22.dp,
-                                        onClick = { navStack.add(ScreenDestination.Profile) },
-                                        modifier = Modifier.padding(horizontal = 4.dp)
-                                    )
                                 }
 
                                 // Scrollable Body: Replicates NestedScrollView in device_settings_fragment_device_settings.xml
