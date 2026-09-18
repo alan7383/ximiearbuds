@@ -148,21 +148,21 @@ fun MiuixMyDevicesScreen(
             }
         }
 
-        // Floating Add Button (@drawable/device_list_add_btn.png) aligned bottom-end
-        Box(
+        // Floating Add Button (1:1 with device_fragment_device_list.xml add_device_btn)
+        // In official layout: wrap_content at bottom-end with 0 margin because 332x330px drawable
+        // already bakes the 57dp circle, 27dp end margin and 37dp bottom shadow margin.
+        Image(
+            painter = painterResource("drawable/device_list_add_btn.png"),
+            contentDescription = stringRes("device_add_title"),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 24.dp, end = 20.dp)
-                .size(60.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onNavigateToAddDevice)
-        ) {
-            Image(
-                painter = painterResource("drawable/device_list_add_btn.png"),
-                contentDescription = stringRes("device_add_title"),
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+                .size(width = 111.dp, height = 110.dp)
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    onClick = onNavigateToAddDevice
+                )
+        )
     }
 }
 
