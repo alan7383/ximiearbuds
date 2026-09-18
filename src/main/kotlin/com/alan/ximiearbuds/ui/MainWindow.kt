@@ -251,12 +251,13 @@ fun MainWindow(
                                     Column(
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        // device_name_tv: 24sp, FontNormal
+                                        // device_name_tv: 24sp, style="@style/FontNormal" (MiSans Normal 24sp)
                                         Text(
                                             text = activeDeviceName,
                                             color = XiaomiTextPrimary,
                                             fontSize = 24.sp,
-                                            fontWeight = FontWeight.SemiBold,
+                                            fontWeight = FontWeight.Normal,
+                                            fontFamily = rememberMiSans(),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )

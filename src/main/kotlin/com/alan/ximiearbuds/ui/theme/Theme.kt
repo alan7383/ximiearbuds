@@ -7,6 +7,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.Font
 import com.alan.ximiearbuds.ximiearbuds.generated.resources.Res
@@ -57,11 +58,12 @@ val XiaomiShapes = Shapes(
     extraLarge = RoundedCornerShape(32.dp)
 )
 
+
 // Vraies polices de l'app officielle (res/font/) :
 // FontRegular/FontMedium -> mipro (= MiSans système) ; FontLatin* -> misanslatin_* bundlés.
 // Sur desktop on charge les OTF MiSans Latin officiels via composeResources.
 @Composable
-private fun rememberMiSans(): FontFamily {
+fun rememberMiSans(): FontFamily {
     val regular = Font(Res.font.misanslatin_regular, FontWeight.Normal)
     val medium = Font(Res.font.misanslatin_medium, FontWeight.Medium)
     val semibold = Font(Res.font.misanslatin_semibold, FontWeight.SemiBold)
@@ -70,8 +72,7 @@ private fun rememberMiSans(): FontFamily {
 }
 
 @Composable
-private fun miSansTypography(): Typography {
-    val miSans = rememberMiSans()
+private fun miSansTypography(miSans: FontFamily): Typography {
     val base = Typography()
     return Typography(
         displayLarge = base.displayLarge.copy(fontFamily = miSans),
@@ -100,14 +101,21 @@ fun XimiEarbudsTheme(
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     val strings = StringsManager.getStrings(language)
-    val typography = miSansTypography()
+    val miSans = rememberMiSans()
+    val typography = miSansTypography(miSans)
 
-    CompositionLocalProvider(LocalStrings provides strings) {
+    CompositionLocalProvider(
+        LocalStrings provides strings,
+        LocalTextStyle provides TextStyle(fontFamily = miSans)
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             shapes = XiaomiShapes,
-            typography = typography,
-            content = content
-        )
+            typography = typography
+        ) {
+            ProvideTextStyle(TextStyle(fontFamily = miSans)) {
+                content()
+            }
+        }
     }
 }
