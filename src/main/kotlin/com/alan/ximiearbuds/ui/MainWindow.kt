@@ -263,7 +263,7 @@ fun MainWindow(
                                         // show_all_device_tv: 14sp, FontRegular, text_color_70, drawableEnd device_settings_drawable_end_all_devices
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.clickable { currentScreen = AppScreen.ADD_DEVICE }
+                                            modifier = Modifier.clickable { navStack.add(ScreenDestination.MyDevices) }
                                         ) {
                                             Text(
                                                 text = stringRes("device_settings_show_all_device"),
@@ -700,6 +700,17 @@ fun MainWindow(
                             ScreenDestination.SecurityCode -> {
                                 MiuixSecurityCodeScreen(
                                     onBackClick = { navStack.removeLast() }
+                                )
+                            }
+
+                            ScreenDestination.MyDevices -> {
+                                MiuixMyDevicesScreen(
+                                    controller = controller,
+                                    onBackClick = { navStack.removeLast() },
+                                    onNavigateToAddDevice = { currentScreen = AppScreen.ADD_DEVICE },
+                                    onDeviceSelected = {
+                                        navStack.removeLast()
+                                    }
                                 )
                             }
 
