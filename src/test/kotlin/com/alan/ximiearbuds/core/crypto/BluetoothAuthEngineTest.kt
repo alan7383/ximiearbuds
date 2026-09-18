@@ -35,4 +35,29 @@ class BluetoothAuthEngineTest {
         corrupted[0] = (corrupted[0] + 1).toByte()
         assertFalse(BluetoothAuthEngine.verifyResponse(rand, corrupted))
     }
+
+    @Test
+    fun `test functionE1 mutual authentication and JNI methods parity`() {
+        val rand = ByteArray(16) { it.toByte() }
+        val linkKey = ByteArray(16) { (15 - it).toByte() }
+
+        val e1Result = BluetoothAuthEngine.functionE1(rand, linkKey)
+        assertEquals(16, e1Result.size)
+
+        // getEncryptedAuthData returns 17 bytes (0x01 prefix + 16-byte E1 output)
+        val authData = BluetoothAuthEngine.getEncryptedAuthData(rand, linkKey)
+        assertEquals(17, authData.size)
+        assertEquals(0x01.toByte(), authData[0])
+        assertArrayEquals(e1Result, authData.sliceArray(1..16))
+
+        // getEncryptedAuthCheckData returns 16 bytes
+        val authCheckData = BluetoothAuthEngine.getEncryptedAuthCheckData(rand, linkKey)
+        assertEquals(16, authCheckData.size)
+        assertArrayEquals(e1Result, authCheckData)
+
+        // getRandomAuthCheckData returns 17 bytes with 0x00 prefix
+        val randCheck = BluetoothAuthEngine.getRandomAuthCheckData()
+        assertEquals(17, randCheck.size)
+        assertEquals(0x00.toByte(), randCheck[0])
+    }
 }

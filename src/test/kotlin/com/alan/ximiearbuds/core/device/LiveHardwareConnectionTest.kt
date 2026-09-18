@@ -13,8 +13,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
+@Tag("hardware")
 class LiveHardwareConnectionTest {
 
     private val targetAddress = "00:BB:43:8B:C0:F3"

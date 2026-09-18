@@ -295,6 +295,7 @@ fun MiuixNoiseReductionView(
                             TransparencyLevel.REGULAR -> stringRes("device_settings_noise_reduction_transparent_standard")
                             TransparencyLevel.VOCAL -> stringRes("device_settings_noise_reduction_transparent_person")
                             TransparencyLevel.AMBIENT -> stringRes("device_settings_noise_reduction_transparent_environment")
+                            TransparencyLevel.VOCAL_PLUS -> stringRes("device_settings_noise_reduction_transparent_person_plus")
                         }
                         OfficialNoiseSlider(
                             gears = tLevels,

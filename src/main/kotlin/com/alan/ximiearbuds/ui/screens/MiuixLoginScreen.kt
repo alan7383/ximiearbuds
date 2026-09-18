@@ -64,7 +64,6 @@ fun MiuixLoginScreen(
     var isLoading by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var showHelpDialog by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
@@ -118,7 +117,6 @@ fun MiuixLoginScreen(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .clickable {
-                            showHelpDialog = true
                             openBrowser("https://account.xiaomi.com/helpcenter")
                         }
                         .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -274,22 +272,11 @@ fun MiuixLoginScreen(
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    val agreementAnnotated = remember(strings) {
-                        buildAnnotatedString {
-                            append("J'ai lu et accepté l'")
-                            pushStringAnnotation(tag = "AGREEMENT", annotation = "https://privacy.mi.com/all/fr_FR/")
-                            withStyle(style = SpanStyle(color = Color(0xFF1F93FF), fontWeight = FontWeight.Medium)) {
-                                append("Accord Utilisateur")
-                            }
-                            pop()
-                            append(" et ")
-                            pushStringAnnotation(tag = "PRIVACY", annotation = "https://account.xiaomi.com/about/protocol/privacy")
-                            withStyle(style = SpanStyle(color = Color(0xFF1F93FF), fontWeight = FontWeight.Medium)) {
-                                append("Politique de Confidentialité")
-                            }
-                            pop()
-                            append(" du Compte Xiaomi.")
-                        }
+                    val agreementTemplate = remember(strings) {
+                        strings["passport_user_agreement_hint_default", "https://privacy.mi.com/all/fr_FR/", "https://account.xiaomi.com/about/protocol/privacy"]
+                    }
+                    val agreementAnnotated = remember(agreementTemplate) {
+                        parseHtmlLinks(agreementTemplate)
                     }
 
                     Text(
@@ -498,67 +485,6 @@ fun MiuixLoginScreen(
 
                 Spacer(modifier = Modifier.height(36.dp))
             }
-        }
-
-        // =========================================================================
-        // 4. Xiaomi Account Help Dialog
-        // =========================================================================
-        if (showHelpDialog) {
-            AlertDialog(
-                onDismissRequest = { showHelpDialog = false },
-                title = {
-                    Text(
-                        text = "Aide — Compte Xiaomi",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 17.sp,
-                        color = textPrimary
-                    )
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = "Assistance et dépannage de connexion :",
-                            fontSize = 14.sp,
-                            color = textPrimary,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = "• Mot de passe oublié : Vous pouvez réinitialiser votre mot de passe instantanément sur le portail officiel Xiaomi.",
-                            fontSize = 13.sp,
-                            color = textSecondary,
-                            lineHeight = 17.sp
-                        )
-                        Text(
-                            text = "• Codes ou SMS non reçus : Utilisez la méthode 'Connexion via Navigateur Web / Code QR' en bas de page pour vous connecter directement avec l'application Xiaomi ou Google.",
-                            fontSize = 13.sp,
-                            color = textSecondary,
-                            lineHeight = 17.sp
-                        )
-                        Text(
-                            text = "• Identifiant : Utilisez indifféremment votre adresse e-mail, numéro de téléphone international (+33...) ou votre ID Xiaomi.",
-                            fontSize = 13.sp,
-                            color = textSecondary,
-                            lineHeight = 17.sp
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            openBrowser("https://account.xiaomi.com/helpcenter")
-                            showHelpDialog = false
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = XiaomiOrange)
-                    ) {
-                        Text("Consulter l'aide en ligne")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showHelpDialog = false }) {
-                        Text(stringRes("close"))
-                    }
-                }
-            )
         }
     }
 }

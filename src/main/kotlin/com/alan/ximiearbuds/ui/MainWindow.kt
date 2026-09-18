@@ -205,7 +205,8 @@ fun MainWindow(
 
                         // Empty State View (device_settings_empty_layout.xml)
                         XiaomiEmptyStateView(
-                            onAddDeviceClicked = { currentScreen = AppScreen.ADD_DEVICE }
+                            onAddDeviceClicked = { currentScreen = AppScreen.ADD_DEVICE },
+                            isDarkTheme = isDarkTheme
                         )
                     }
 

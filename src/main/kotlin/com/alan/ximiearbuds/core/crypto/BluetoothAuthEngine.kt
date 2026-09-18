@@ -241,4 +241,94 @@ object BluetoothAuthEngine {
         val expected = encrypt(randFactor, bdAddr)
         return expected.contentEquals(earbudResponse)
     }
+
+    /**
+     * Executes the full mutual authentication algorithm (function_E1test / function_xiaomi in libxm_bluetooth.so).
+     *
+     * 1. Pass 1: SAFER+ on randFactor with linkKey in standard mode (isE21 = false)
+     * 2. Intermediate mix: (pass1[i] ^ randFactor[i] + bdAddr[i % 6]) mod 256
+     * 3. Key2 derivation: Key diversification using constants from libxm_bluetooth.so
+     * 4. Pass 2: SAFER+ on intermediate mix with key2 in E21 mode (isE21 = true)
+     */
+    fun functionE1(randFactor: ByteArray, linkKey: ByteArray, bdAddr: ByteArray = DUMMY_BD_ADDR): ByteArray {
+        require(randFactor.size == 16) { "randFactor must be exactly 16 bytes" }
+        require(linkKey.size == 16) { "linkKey must be exactly 16 bytes" }
+        require(bdAddr.size >= 6) { "bdAddr must have at least 6 bytes" }
+
+        // Pass 1: standard SAFER+ (isE21 = false)
+        val block1 = IntArray(16) { randFactor[it].toInt() and 0xFF }
+        val key1 = IntArray(16) { linkKey[it].toInt() and 0xFF }
+        val subkeys1 = generateSubkeys(key1)
+        val pass1 = cipherCore(block1, subkeys1, isE21 = false)
+
+        // Intermediate mix: (pass1[i] ^ randFactor[i] + bdAddr[i % 6]) & 0xFF
+        val intermediate = IntArray(16) { i ->
+            val p1 = pass1[i].toInt() and 0xFF
+            val rf = randFactor[i].toInt() and 0xFF
+            val bd = bdAddr[i % 6].toInt() and 0xFF
+            ((p1 xor rf) + bd) and 0xFF
+        }
+
+        // Key2 derivation
+        val key2 = IntArray(16)
+        val k = key1
+        key2[0] = (k[0] - 0x17) and 0xFF
+        key2[1] = (k[1] xor 0xe5) and 0xFF
+        key2[2] = (k[2] - 0x21) and 0xFF
+        key2[3] = (k[3] xor 0xc1) and 0xFF
+        key2[4] = (k[4] - 0x4d) and 0xFF
+        key2[5] = (k[5] xor 0xa7) and 0xFF
+        key2[6] = (k[6] - 0x6b) and 0xFF
+        key2[7] = (k[7] xor 0x83) and 0xFF
+        key2[8] = (k[8] xor 0xe9) and 0xFF
+        key2[9] = (k[9] - 0x1b) and 0xFF
+        key2[10] = (k[10] xor 0xdf) and 0xFF
+        key2[11] = (k[11] - 0x3f) and 0xFF
+        key2[12] = (k[12] xor 0xb3) and 0xFF
+        key2[13] = (k[13] - 0x59) and 0xFF
+        key2[14] = (k[14] xor 0x95) and 0xFF
+        key2[15] = (k[15] - 0x7d) and 0xFF
+
+        // Pass 2: SAFER+ in E21 mode (isE21 = true)
+        val subkeys2 = generateSubkeys(key2)
+        return cipherCore(intermediate, subkeys2, isE21 = true)
+    }
+
+    /**
+     * Replicates JNI getEncryptedAuthData(byte[] random) from libxm_bluetooth.so:
+     * Returns 17 bytes: [0x01, e1_output[0..15]]
+     */
+    fun getEncryptedAuthData(randFactor: ByteArray, linkKey: ByteArray): ByteArray {
+        val out16 = functionE1(randFactor, linkKey)
+        val res = ByteArray(17)
+        res[0] = 0x01
+        System.arraycopy(out16, 0, res, 1, 16)
+        return res
+    }
+
+    /**
+     * Replicates JNI getEncryptedAuthCheckData(byte[] randomFactor) from libxm_bluetooth.so:
+     * Returns 16 bytes: e1_output[0..15]
+     */
+    fun getEncryptedAuthCheckData(randFactor: ByteArray, linkKey: ByteArray): ByteArray {
+        return functionE1(randFactor, linkKey)
+    }
+
+    /**
+     * Replicates JNI getRandomAuthData() from libxm_bluetooth.so:
+     * Returns 16 random bytes.
+     */
+    fun getRandomAuthData(): ByteArray = generateRandomFactor()
+
+    /**
+     * Replicates JNI getRandomAuthCheckData() from libxm_bluetooth.so:
+     * Returns 17 bytes: [0x00, 16 random bytes]
+     */
+    fun getRandomAuthCheckData(): ByteArray {
+        val rand = generateRandomFactor()
+        val res = ByteArray(17)
+        res[0] = 0x00
+        System.arraycopy(rand, 0, res, 1, 16)
+        return res
+    }
 }

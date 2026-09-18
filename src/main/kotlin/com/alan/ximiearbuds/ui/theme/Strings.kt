@@ -1,6 +1,12 @@
 package com.alan.ximiearbuds.ui.theme
 
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import kotlinx.serialization.json.Json
 import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
@@ -95,4 +101,38 @@ class Strings(
 fun stringRes(key: String, vararg args: Any): String {
     val strings = LocalStrings.current
     return strings.get(key, *args)
+}
+
+/**
+ * Parses official Xiaomi HTML formatted string resources (like `<a href=%1$s>Text</a>`)
+ * into Compose AnnotatedString with clickable URL annotations.
+ */
+fun parseHtmlLinks(
+    html: String,
+    linkColor: Color = Color(0xFF1F93FF)
+): AnnotatedString {
+    val regex = Regex("""<a\s+href=['"]?([^'">]+)['"]?>(.*?)</a>""")
+    return buildAnnotatedString {
+        var lastIndex = 0
+        val matches = regex.findAll(html)
+        for (match in matches) {
+            val range = match.range
+            if (range.first > lastIndex) {
+                append(html.substring(lastIndex, range.first))
+            }
+            val url = match.groupValues[1]
+            val linkText = match.groupValues[2]
+            pushStringAnnotation(tag = "URL", annotation = url)
+            pushStringAnnotation(tag = "AGREEMENT", annotation = url)
+            withStyle(SpanStyle(color = linkColor, fontWeight = FontWeight.Medium)) {
+                append(linkText)
+            }
+            pop()
+            pop()
+            lastIndex = range.last + 1
+        }
+        if (lastIndex < html.length) {
+            append(html.substring(lastIndex))
+        }
+    }
 }

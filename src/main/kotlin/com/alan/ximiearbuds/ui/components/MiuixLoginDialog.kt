@@ -36,7 +36,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.alan.ximiearbuds.core.account.XiaomiAccountClient
 import com.alan.ximiearbuds.ui.theme.LocalStrings
+import com.alan.ximiearbuds.ui.theme.XiaomiOrange
 import com.alan.ximiearbuds.ui.theme.stringRes
+import com.alan.ximiearbuds.ui.theme.parseHtmlLinks
 import kotlinx.coroutines.launch
 import java.awt.Desktop
 import java.net.URI
@@ -229,22 +231,11 @@ fun MiuixLoginDialog(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    val agreementAnnotated = remember(strings) {
-                        buildAnnotatedString {
-                            append("J'ai lu et accepté l'")
-                            pushStringAnnotation(tag = "AGREEMENT", annotation = "https://privacy.mi.com/all/fr_FR/")
-                            withStyle(style = SpanStyle(color = Color(0xFF1F93FF), fontWeight = FontWeight.Medium)) {
-                                append("Accord Utilisateur")
-                            }
-                            pop()
-                            append(" et ")
-                            pushStringAnnotation(tag = "PRIVACY", annotation = "https://account.xiaomi.com/about/protocol/privacy")
-                            withStyle(style = SpanStyle(color = Color(0xFF1F93FF), fontWeight = FontWeight.Medium)) {
-                                append("Politique de Confidentialité")
-                            }
-                            pop()
-                            append(" du Compte Xiaomi.")
-                        }
+                    val agreementTemplate = remember(strings) {
+                        strings["passport_user_agreement_hint_default", "https://privacy.mi.com/all/fr_FR/", "https://account.xiaomi.com/about/protocol/privacy"]
+                    }
+                    val agreementAnnotated = remember(agreementTemplate) {
+                        parseHtmlLinks(agreementTemplate)
                     }
 
                     Text(

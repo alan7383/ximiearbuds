@@ -36,7 +36,17 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("hardware")
+    }
+}
+
+tasks.register<Test>("hardwareTest") {
+    description = "Runs live hardware integration tests against physical Bluetooth earbuds"
+    group = "verification"
+    useJUnitPlatform {
+        includeTags("hardware")
+    }
 }
 
 kotlin {

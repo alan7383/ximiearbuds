@@ -371,7 +371,8 @@ enum class AncLevel(val id: Int) {
 enum class TransparencyLevel(val id: Int) {
     REGULAR(0),
     VOCAL(1),
-    AMBIENT(2);
+    AMBIENT(2),
+    VOCAL_PLUS(3);
 
     companion object {
         fun fromId(id: Int): TransparencyLevel = entries.find { it.id == id } ?: REGULAR
@@ -385,8 +386,8 @@ data class NoiseControlState(
     val isAutoNoise: Boolean = false,
     val isSmartDenoise: Boolean = false,
     val isPersonalizedAnc: Boolean = false,
-    val ancLevelIndex: Int = 1,
-    val transparencyLevelIndex: Int = 0
+    val ancLevelIndex: Int = ancLevel.id,
+    val transparencyLevelIndex: Int = transparencyLevel.id
 ) {
     fun toCommonConfig(): CommonConfig {
         val levelByte = when (mode) {

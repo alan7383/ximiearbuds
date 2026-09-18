@@ -1,16 +1,12 @@
 package com.alan.ximiearbuds.ui.components
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -20,77 +16,102 @@ import androidx.compose.ui.unit.sp
 import com.alan.ximiearbuds.ui.theme.*
 
 /**
- * 1:1 Clone of official Xiaomi Empty State: device_settings_empty_layout.xml
+ * 1:1 authentic reproduction of official Xiaomi Empty State:
+ * device_settings_empty_layout.xml
+ *
+ * Layout hierarchy:
+ * - ConstraintLayout (match_parent)
+ *   - TextView @id/ic_tv (drawableTop = device_list_empty, text = @string/device_no_available_device, 14sp, text_color_40)
+ *   - TextView @id/add (text = @string/device_no_paired_device_tip, 14sp, text_color_40, margin 20dp)
+ *   - TextView @id/add_view (BaseButton.Positive style, 16sp white, radius 180dp, margins 27dp, text = @string/device_add_title)
  */
 @Composable
 fun XiaomiEmptyStateView(
     onAddDeviceClicked: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isDarkTheme: Boolean = true
 ) {
+    val textMutedColor = if (isDarkTheme) XiaomiTextMuted else XiaomiLightTextMuted
+    val emptyIllustration = if (isDarkTheme) {
+        "drawable/device_list_empty_night.webp"
+    } else {
+        "drawable/device_list_empty.webp"
+    }
+
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
+        modifier = modifier.fillMaxSize()
     ) {
+        // Centered section: ic_tv + add
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.widthIn(max = 480.dp)
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(horizontal = 20.dp)
+                .widthIn(max = 480.dp)
         ) {
-            // Official Empty State Illustration (device_list_empty.webp)
+            // @id/ic_tv: drawableTop = device_list_empty
             Image(
-                painter = painterResource("drawable/device_list_empty.webp"),
+                painter = painterResource(emptyIllustration),
                 contentDescription = null,
-                modifier = Modifier
-                    .size(160.dp)
-                    .padding(bottom = 20.dp)
+                modifier = Modifier.size(160.dp)
             )
 
-            // Title: @string/device_no_available_device
+            Spacer(modifier = Modifier.height(10.dp)) // android:drawablePadding="10dp"
+
+            // @id/ic_tv text: @string/device_no_available_device
             Text(
                 text = stringRes("device_no_available_device"),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = XiaomiTextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal,
+                color = textMutedColor,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Subtitle: @string/device_no_paired_device_tip
+            // @id/add text: @string/device_no_paired_device_tip
             Text(
                 text = stringRes("device_no_paired_device_tip"),
-                fontSize = 13.5.sp,
-                color = XiaomiTextMuted,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal,
+                color = textMutedColor,
                 lineHeight = 20.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 20.dp)
             )
+        }
 
-            Spacer(modifier = Modifier.height(36.dp))
-
-            // Positive Action Button: @string/device_add_title ("Ajouter des écouteurs")
+        // Bottom-pinned button: @id/add_view (style=@style/BaseButton.Positive)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 27.dp, end = 27.dp, bottom = 27.dp)
+                .widthIn(max = 480.dp)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
             Button(
                 onClick = onAddDeviceClicked,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(180.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = XiaomiCyan,
+                    containerColor = XiaomiElectricBlue,
                     contentColor = Color.White
                 ),
-                shape = RoundedCornerShape(24.dp),
-                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 14.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 0.dp,
+                    pressedElevation = 2.dp
+                ),
+                contentPadding = PaddingValues(vertical = 12.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = stringRes("device_add_title"),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White
                 )
             }
         }

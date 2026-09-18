@@ -1,5 +1,6 @@
 package com.alan.ximiearbuds.core.device
 
+import com.alan.ximiearbuds.core.storage.mmkv.MMKV
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -15,9 +16,9 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Clean, production-ready device preferences manager for Xiaomi Earbuds.
- * Persists user device settings (e.g. detected or chosen color variant) in ~/.ximiearbuds/device_settings.json.
- * Does NOT contain any hardcoded MAC addresses or preconfigured user data.
+ * Authentic device preferences manager for Xiaomi Earbuds.
+ * Backed 1:1 by Tencent MMKV binary storage (~/.ximiearbuds/mmkv/app_pref) as in the official Android app.
+ * Maintains transparent backward compatibility with ~/.ximiearbuds/device_settings.json.
  */
 object DevicePreferences {
     private val scope = CoroutineScope(Dispatchers.IO)
@@ -25,6 +26,11 @@ object DevicePreferences {
 
     private val baseDir: File = File(System.getProperty("user.home"), ".ximiearbuds").apply {
         if (!exists()) mkdirs()
+    }
+
+    private val mmkv: MMKV by lazy {
+        MMKV.initialize(File(baseDir, "mmkv"))
+        MMKV.mmkvWithID("app_pref", MMKV.MULTI_PROCESS_MODE)
     }
 
     private val settingsFile: File = File(baseDir, "device_settings.json")
@@ -53,6 +59,32 @@ object DevicePreferences {
 
     private fun loadSettings() {
         try {
+            if (mmkv.count() > 0) {
+                lastUsedDevice = mmkv.decodeString("lastUsedDevice")
+                isWelcomeFinished = mmkv.decodeBool("welcomeFinished", false)
+                isLoggedIn = mmkv.decodeBool("isLoggedIn", false)
+                userId = mmkv.decodeString("userId")
+                userName = mmkv.decodeString("userName")
+                avatarAddress = mmkv.decodeString("avatarAddress")
+                region = mmkv.decodeString("region", "France") ?: "France"
+                userExperienceAccepted = mmkv.decodeBool("userExperienceAccepted", true)
+                deviceAssociated = mmkv.decodeBool("deviceAssociated", true)
+
+                val colorEntries = mmkv.decodeStringSet("device_colors")
+                colorEntries?.forEach { entry ->
+                    val parts = entry.split("=")
+                    if (parts.size == 2) {
+                        val mac = parts[0]
+                        val c = parts[1].toIntOrNull()
+                        if (c != null && c > 0) {
+                            colorMap[normalizeKey(mac)] = c
+                        }
+                    }
+                }
+                return
+            }
+
+            // Legacy import from device_settings.json if MMKV is not yet populated
             if (settingsFile.exists() && settingsFile.length() > 0L) {
                 val content = settingsFile.readText()
                 val root = jsonParser.parseToJsonElement(content).jsonObject
@@ -75,6 +107,7 @@ object DevicePreferences {
                         colorMap[normalizeKey(mac)] = c
                     }
                 }
+                saveSettingsAsync()
             }
         } catch (e: Exception) {
             // Ignore parse errors on corrupted file, start clean
@@ -84,6 +117,21 @@ object DevicePreferences {
     private fun saveSettingsAsync() {
         scope.launch {
             try {
+                // Save to 1:1 MMKV binary storage
+                mmkv.encode("lastUsedDevice", lastUsedDevice)
+                mmkv.encode("welcomeFinished", isWelcomeFinished)
+                mmkv.encode("isLoggedIn", isLoggedIn)
+                mmkv.encode("userId", userId)
+                mmkv.encode("userName", userName)
+                mmkv.encode("avatarAddress", avatarAddress)
+                mmkv.encode("region", region)
+                mmkv.encode("userExperienceAccepted", userExperienceAccepted)
+                mmkv.encode("deviceAssociated", deviceAssociated)
+                val colorSet = colorMap.map { "${it.key}=${it.value}" }.toSet()
+                mmkv.encode("device_colors", colorSet)
+                mmkv.sync()
+
+                // Mirror to JSON for legacy compatibility
                 val json = buildJsonObject {
                     lastUsedDevice?.let { put("lastUsedDevice", it) }
                     put("welcomeFinished", isWelcomeFinished)
