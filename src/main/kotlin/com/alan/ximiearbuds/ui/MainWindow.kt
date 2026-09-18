@@ -142,7 +142,6 @@ fun MainWindow(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp)
-                                .background(XiaomiCardBg)
                                 .padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -244,7 +243,6 @@ fun MainWindow(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(XiaomiCardBg)
                                         .padding(horizontal = 20.dp, vertical = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
