@@ -700,9 +700,21 @@ fun MainWindow(
 
                             ScreenDestination.Login -> {
                                 MiuixLoginScreen(
-                                    onBackClick = { navStack.removeLast() },
+                                    onBackClick = {
+                                        if (navStack.size > 1) {
+                                            navStack.removeLast()
+                                        } else {
+                                            navStack.clear()
+                                            navStack.add(ScreenDestination.Profile)
+                                        }
+                                    },
                                     onLoginSuccess = { _, _ ->
-                                        navStack.removeLast()
+                                        if (navStack.size > 1) {
+                                            navStack.removeLast()
+                                        } else {
+                                            navStack.clear()
+                                            navStack.add(ScreenDestination.Profile)
+                                        }
                                     }
                                 )
                             }

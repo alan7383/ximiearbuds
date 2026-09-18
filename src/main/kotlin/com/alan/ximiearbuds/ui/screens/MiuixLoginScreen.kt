@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -63,6 +64,7 @@ fun MiuixLoginScreen(
     var isLoading by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
@@ -86,14 +88,14 @@ fun MiuixLoginScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Back button (passport_back_icon)
+                // Back button (ic_base_back.webp, with ColorFilter tint for dark/light mode)
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
                         .clickable {
                             if (!isLoading) {
@@ -104,24 +106,30 @@ fun MiuixLoginScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource("drawable/passport_back_icon.png"),
+                        painter = painterResource("drawable/ic_base_back.webp"),
                         contentDescription = stringRes("passport_back"),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp),
+                        colorFilter = ColorFilter.tint(textPrimary)
                     )
                 }
 
                 // Help button (passport_help: "Aide")
-                Text(
-                    text = stringRes("passport_help"),
-                    fontSize = 15.sp,
-                    color = textSecondary,
+                Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .clickable {
+                            showHelpDialog = true
                             openBrowser("https://account.xiaomi.com/helpcenter")
                         }
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
-                )
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = stringRes("passport_help"),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = textSecondary
+                    )
+                }
             }
 
             // =========================================================================
@@ -491,6 +499,67 @@ fun MiuixLoginScreen(
                 Spacer(modifier = Modifier.height(36.dp))
             }
         }
+
+        // =========================================================================
+        // 4. Xiaomi Account Help Dialog
+        // =========================================================================
+        if (showHelpDialog) {
+            AlertDialog(
+                onDismissRequest = { showHelpDialog = false },
+                title = {
+                    Text(
+                        text = "Aide — Compte Xiaomi",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 17.sp,
+                        color = textPrimary
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = "Assistance et dépannage de connexion :",
+                            fontSize = 14.sp,
+                            color = textPrimary,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "• Mot de passe oublié : Vous pouvez réinitialiser votre mot de passe instantanément sur le portail officiel Xiaomi.",
+                            fontSize = 13.sp,
+                            color = textSecondary,
+                            lineHeight = 17.sp
+                        )
+                        Text(
+                            text = "• Codes ou SMS non reçus : Utilisez la méthode 'Connexion via Navigateur Web / Code QR' en bas de page pour vous connecter directement avec l'application Xiaomi ou Google.",
+                            fontSize = 13.sp,
+                            color = textSecondary,
+                            lineHeight = 17.sp
+                        )
+                        Text(
+                            text = "• Identifiant : Utilisez indifféremment votre adresse e-mail, numéro de téléphone international (+33...) ou votre ID Xiaomi.",
+                            fontSize = 13.sp,
+                            color = textSecondary,
+                            lineHeight = 17.sp
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            openBrowser("https://account.xiaomi.com/helpcenter")
+                            showHelpDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = XiaomiOrange)
+                    ) {
+                        Text("Consulter l'aide en ligne")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showHelpDialog = false }) {
+                        Text(stringRes("close"))
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -619,12 +688,39 @@ private fun startWebLoginFlow(
 
 private fun openBrowser(url: String) {
     try {
-        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            Desktop.getDesktop().browse(URI(url))
-        } else {
-            Runtime.getRuntime().exec(arrayOf("xdg-open", url))
+        val os = System.getProperty("os.name", "").lowercase()
+        when {
+            os.contains("win") -> {
+                ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url).start()
+            }
+            os.contains("mac") -> {
+                ProcessBuilder("open", url).start()
+            }
+            else -> {
+                // Linux (KDE Wayland, GNOME, etc.)
+                var started = false
+                val commands = listOf(
+                    listOf("xdg-open", url),
+                    listOf("kde-open5", url),
+                    listOf("kde-open", url),
+                    listOf("gio", "open", url)
+                )
+                for (cmd in commands) {
+                    try {
+                        val pb = ProcessBuilder(cmd)
+                        pb.redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                        pb.redirectError(ProcessBuilder.Redirect.DISCARD)
+                        pb.start()
+                        started = true
+                        break
+                    } catch (ignored: Exception) {}
+                }
+                if (!started && Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                    Desktop.getDesktop().browse(URI(url))
+                }
+            }
         }
     } catch (e: Exception) {
-        println("MiuixLoginScreen: openBrowser failed: ${e.message}")
+        println("openBrowser failed: ${e.message}")
     }
 }
