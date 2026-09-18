@@ -27,4 +27,5 @@ sealed class ScreenDestination(val titleResKey: String) {
     object Profile : ScreenDestination("mine_label")
     object SecurityCode : ScreenDestination("mine_security_title")
     object MyDevices : ScreenDestination("device_my_devices")
+    object Login : ScreenDestination("passport_mi_account_title")
 }

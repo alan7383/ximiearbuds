@@ -692,8 +692,18 @@ fun MainWindow(
                                         }
                                     },
                                     onNavigateToSecurityCode = { navStack.add(ScreenDestination.SecurityCode) },
+                                    onNavigateToLogin = { navStack.add(ScreenDestination.Login) },
                                     currentLanguage = currentLanguage,
                                     onLanguageSelected = onLanguageSelected
+                                )
+                            }
+
+                            ScreenDestination.Login -> {
+                                MiuixLoginScreen(
+                                    onBackClick = { navStack.removeLast() },
+                                    onLoginSuccess = { _, _ ->
+                                        navStack.removeLast()
+                                    }
                                 )
                             }
 

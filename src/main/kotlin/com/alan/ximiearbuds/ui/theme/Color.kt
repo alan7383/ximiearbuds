@@ -13,6 +13,7 @@ val XiaomiCardBorder = Color(0x1AFFFFFF)
 val XiaomiCyan = Color(0xFF00BDB1)          // Active Noise Control highlight
 val XiaomiCyanGlow = Color(0xFF00E5D4)
 val XiaomiBlue = Color(0xFF2598E5)          // Connected state / Links
+val XiaomiElectricBlue = Color(0xFF0D84FF)  // Xiaomi HyperOS Electric Blue (Bluetooth scanning, primary buttons, tags)
 val XiaomiOrange = Color(0xFFF04D18)        // Xiaomi brand primary
 val XiaomiGreen = Color(0xFF10B981)         // Battery ok / Connected status
 val XiaomiRed = Color(0xFFEF4444)

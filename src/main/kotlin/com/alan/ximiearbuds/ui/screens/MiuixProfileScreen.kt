@@ -40,6 +40,7 @@ import java.net.URI
 fun MiuixProfileScreen(
     onBackClick: () -> Unit,
     onNavigateToSecurityCode: () -> Unit,
+    onNavigateToLogin: () -> Unit = {},
     currentLanguage: AppLanguage,
     onLanguageSelected: (AppLanguage) -> Unit,
     modifier: Modifier = Modifier
@@ -53,6 +54,12 @@ fun MiuixProfileScreen(
     var currentRegion by remember { mutableStateOf(DevicePreferences.getRegion()) }
     var userExperienceAccepted by remember { mutableStateOf(DevicePreferences.isUserExperienceAccepted()) }
     var deviceAssociated by remember { mutableStateOf(DevicePreferences.isDeviceAssociated()) }
+
+    LaunchedEffect(Unit) {
+        isLoggedIn = DevicePreferences.isLoggedIn()
+        userId = DevicePreferences.getUserId()
+        userName = DevicePreferences.getUserName()
+    }
 
     // Dialog Visibility States
     var showAccountInfoDialog by remember { mutableStateOf(false) }
@@ -102,7 +109,7 @@ fun MiuixProfileScreen(
                         indication = null,
                         onClick = {
                             if (!isLoggedIn) {
-                                showLoginDialog = true
+                                onNavigateToLogin()
                             } else {
                                 showAccountInfoDialog = true
                             }
