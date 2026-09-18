@@ -288,7 +288,10 @@ fun MainWindow(
                                         modifier = Modifier.size(36.dp)
                                     ) {
                                         Image(
-                                            painter = painterResource("drawable/device_setting_add_device.webp"),
+                                            painter = painterResource(
+                                                if (isDarkTheme) "drawable/device_setting_add_device_night.webp"
+                                                else "drawable/device_setting_add_device.webp"
+                                            ),
                                             contentDescription = stringRes("device_add_title"),
                                             modifier = Modifier.size(24.dp)
                                         )
