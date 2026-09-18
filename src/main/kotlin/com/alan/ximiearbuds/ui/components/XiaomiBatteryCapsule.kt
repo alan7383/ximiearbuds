@@ -121,7 +121,7 @@ private fun BatteryItem(
                 Spacer(modifier = Modifier.width(3.dp))
                 Image(
                     painter = painterResource("drawable/device_settings_charging.webp"),
-                    contentDescription = "Charging",
+                    contentDescription = null,
                     modifier = Modifier.size(13.dp)
                 )
             }
@@ -193,7 +193,7 @@ private fun CaseBatteryItem(
                 Spacer(modifier = Modifier.width(3.dp))
                 Image(
                     painter = painterResource("drawable/device_settings_charging.webp"),
-                    contentDescription = "Charging",
+                    contentDescription = null,
                     modifier = Modifier.size(13.dp)
                 )
             }

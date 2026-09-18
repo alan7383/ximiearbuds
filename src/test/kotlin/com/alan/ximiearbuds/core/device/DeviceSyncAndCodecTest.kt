@@ -66,6 +66,28 @@ class DeviceSyncAndCodecTest {
     }
 
     @Test
+    fun `test NotificationVolume 1-byte payload parses without crash (regression)`() {
+        // 1:1 DeviceConfigNotificationVolume : paramsToValue = [current] (1 byte).
+        // L'ancien parse lisait value[1] -> ArrayIndexOutOfBounds qui tuait le collector.
+        val oneByte = CommonConfig(type = ConfigId.NOTIFICATION_VOLUME, value = byteArrayOf(80))
+        assertEquals(80, oneByte.value[0].toInt() and 0xFF)
+        // Encodage d'envoi 1:1 = 1 byte unique
+        val encoded = oneByte.toByteArray()
+        val parsed = CommonConfig.parseList(encoded)
+        assertEquals(1, parsed.size)
+        assertEquals(ConfigId.NOTIFICATION_VOLUME, parsed[0].type)
+        assertEquals(1, parsed[0].value.size)
+        assertEquals(80, parsed[0].value[0].toInt() and 0xFF)
+
+        // Format long 4 bytes (current/recommended/max/min) accepté aussi
+        val fourBytes = CommonConfig(
+            type = ConfigId.NOTIFICATION_VOLUME,
+            value = byteArrayOf(70, 60, 100, 0)
+        )
+        assertEquals(70, fourBytes.value[0].toInt() and 0xFF)
+    }
+
+    @Test
     fun `test VendorDataCodec OpCode 8 noise mode encoding`() {
         val payload = OfficialPayloadCodecs.VendorDataCodec.encodeNoiseMode(1) // ANC
         assertEquals(3, payload.size)
@@ -142,14 +164,15 @@ class DeviceSyncAndCodecTest {
         assertEquals(NoiseMode.TRANSPARENCY, state2?.mode)
         assertEquals(TransparencyLevel.VOCAL, state2?.transparencyLevel)
 
-        // CONFIG_AUDIO_MODE (1)
+        // CONFIG_AUDIO_MODE (1) = Xiaomi/Dolby audio mode, PAS du ANC.
+        // Officiel: DeviceConfigNoiseLevel = super(11) uniquement, jamais 1.
+        // Donc fromCommonConfig doit retourner null pour config 1.
         val cfgAudioMode = CommonConfig(
             type = ConfigId.CONFIG_AUDIO_MODE,
             value = byteArrayOf(1) // ANC
         )
         val stateAudio = NoiseControlState.fromCommonConfig(cfgAudioMode, NoiseControlState(mode = NoiseMode.OFF))
-        assertNotNull(stateAudio)
-        assertEquals(NoiseMode.ANC, stateAudio?.mode)
+        assertNull(stateAudio)
     }
 
     @Test

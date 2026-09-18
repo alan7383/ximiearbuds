@@ -1,5 +1,6 @@
 package com.alan.ximiearbuds.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,7 +9,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,10 +23,11 @@ import com.alan.ximiearbuds.ui.components.MiuixTopAppBar
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
 import com.alan.ximiearbuds.ui.components.XiaomiItemDivider
 import com.alan.ximiearbuds.ui.theme.*
+import androidx.compose.ui.res.painterResource
 
 /**
- * 1:1 authentic reproduction of `device_settings_fragment_usb.xml`
- * (com.mi.earphone.settings.ui.usb.DongleSettingsFragment).
+ * 1:1 replica of Xiaomi Earbuds `device_settings_fragment_usb.xml` & `DongleSettingsFragment.java`.
+ * Uses authentic official drawables, official string resources, and live dongle state bindings.
  */
 @Composable
 fun MiuixDongleSettingsScreen(
@@ -40,10 +41,10 @@ fun MiuixDongleSettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(XiaomiPageBg)
+            .background(XiaomiSurface)
     ) {
         MiuixTopAppBar(
-            title = stringRes("device_settings_usb_update"),
+            title = stringRes("device_settings_usb_mode"),
             onBackClick = onBackClick
         )
 
@@ -52,46 +53,45 @@ fun MiuixDongleSettingsScreen(
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Dongle Status Hero
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(XiaomiCardBg)
-                    .padding(20.dp),
-                contentAlignment = Alignment.Center
-            ) {
+            // Hero Status Card with Official Dongle Asset
+            XiaomiCardContainer {
                 Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(64.dp)
-                            .clip(RoundedCornerShape(32.dp))
+                            .size(72.dp)
+                            .clip(RoundedCornerShape(36.dp))
                             .background(XiaomiCyan.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Usb,
+                        Image(
+                            painter = painterResource(
+                                if (dongleState.dongleInserted) "drawable/device_settings_dongle_settings_icon.png"
+                                else "drawable/device_settings_dongle_settings_icon_disable.png"
+                            ),
                             contentDescription = null,
-                            tint = XiaomiCyan,
-                            modifier = Modifier.size(34.dp)
+                            modifier = Modifier.size(44.dp)
                         )
                     }
                     Text(
-                        text = "Émetteur sans fil USB 2.4 GHz",
+                        text = stringRes("device_settings_usb_mode"),
                         color = XiaomiTextPrimary,
-                        fontSize = 16.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Connecté • Mode ultra-basse latence actif",
-                        color = XiaomiGreen,
-                        fontSize = 12.sp,
+                        text = if (dongleState.dongleInserted) stringRes("device_settings_device_connected_usb")
+                               else stringRes("device_settings_device_disconnected_usb"),
+                        color = if (dongleState.dongleInserted) XiaomiGreen else XiaomiTextSecondary,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -99,18 +99,18 @@ fun MiuixDongleSettingsScreen(
 
             // Group 1: Transmission Modes
             Text(
-                text = "Mode de transmission",
+                text = stringRes("device_settings_function_settings").uppercase(),
                 color = XiaomiTextSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(start = 8.dp)
             )
 
             XiaomiCardContainer {
                 val modes = listOf(
-                    0 to ("Audio haute fidélité sans perte" to "Bande passante audio maximale pour la musique"),
-                    1 to ("Mode Gaming ultra-basse latence" to "Latence minimale pour les jeux compétitifs (20 ms)"),
-                    2 to ("Mode micro haute définition" to "Privilégie la clarté du microphone en direct")
+                    0 to (stringRes("device_settings_usb_mode_lossless_audio") to stringRes("device_settings_spatial_audio_audio_mode")),
+                    1 to (stringRes("device_settings_spatial_audio_low_latency") to stringRes("device_settings_low_latency_desc")),
+                    2 to (stringRes("device_settings_usb_mode_wireless_mic") to stringRes("device_settings_voice_control"))
                 )
 
                 modes.forEachIndexed { index, (modeId, info) ->
@@ -155,10 +155,10 @@ fun MiuixDongleSettingsScreen(
 
             // Group 2: Monitoring Volume
             Text(
-                text = "Retour moniteur casque",
+                text = stringRes("device_settings_dongle_in_ear_monitor").uppercase(),
                 color = XiaomiTextSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(start = 8.dp)
             )
 
@@ -172,13 +172,13 @@ fun MiuixDongleSettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Retour microphone en temps réel",
+                            text = stringRes("device_settings_dongle_in_ear_monitor"),
                             color = XiaomiTextPrimary,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = "Entendre votre propre voix dans les écouteurs",
+                            text = stringRes("device_settings_dongle_in_ear_monitor_click"),
                             color = XiaomiTextSecondary,
                             fontSize = 12.sp
                         )
@@ -208,7 +208,7 @@ fun MiuixDongleSettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Volume du retour",
+                                text = stringRes("device_settings_notification_volume_title"),
                                 color = XiaomiTextPrimary,
                                 fontSize = 13.sp
                             )

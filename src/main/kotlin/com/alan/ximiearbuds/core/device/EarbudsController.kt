@@ -1,5 +1,6 @@
 package com.alan.ximiearbuds.core.device
 
+import com.alan.ximiearbuds.core.audio.FitDetectionAudioPlayer
 import com.alan.ximiearbuds.core.bluetooth.*
 import com.alan.ximiearbuds.core.crypto.BluetoothAuthEngine
 import com.alan.ximiearbuds.core.protocol.*
@@ -67,8 +68,27 @@ class EarbudsController(
     private val _otaState = MutableStateFlow(OtaFirmwareState())
     val otaState: StateFlow<OtaFirmwareState> = _otaState
 
+    // Trajet immersif / Commuting immerse (config 103, fonction 1009).
+    // Officiel : DeviceSettingsViewModel._commutingImmerse (défaut = close = 0),
+    // DeviceConfigCommutingImmerse(status) 0=close 1=flight 2=subway 3=HSR.
+    private val _commutingImmerseMode = MutableStateFlow(0)
+    val commutingImmerseMode: StateFlow<Int> = _commutingImmerseMode
+
+    private val _earboxSound = MutableStateFlow(EarboxSoundState())
+    val earboxSound: StateFlow<EarboxSoundState> = _earboxSound
+
+    private val _fitDetection = MutableStateFlow(FitDetectionState())
+    val fitDetection: StateFlow<FitDetectionState> = _fitDetection
+
+    private val _callListenerSeconds = MutableStateFlow(0)
+    val callListenerSeconds: StateFlow<Int> = _callListenerSeconds
+
+    private val _voiceHotword = MutableStateFlow(false)
+    val voiceHotword: StateFlow<Boolean> = _voiceHotword
+
     private var packetCollectorJob: Job? = null
     private var periodicPollJob: Job? = null
+    private var fitDetectionTimeoutJob: Job? = null
 
     init {
         setupTransport(isDemo = false)
@@ -92,6 +112,7 @@ class EarbudsController(
     }
 
     private var activeDeviceAddress: String = ""
+    private var isAuthenticating: Boolean = false
 
     fun selectModel(model: EarbudsModel) {
         _activeModel.value = model
@@ -274,82 +295,169 @@ class EarbudsController(
         }
     }
 
+    fun release() {
+        periodicPollJob?.cancel()
+        packetCollectorJob?.cancel()
+        scanJob?.cancel()
+        disconnect()
+    }
+
+    private suspend fun isConnected(): Boolean =
+        transport.connectionState.value == ConnectionState.CONNECTED
+
     private suspend fun performAuthentication(): Boolean {
         if (isSimulated) return true
 
-        println("EarbudsController: Starting Xiaomi Bluetooth Authentication Handshake (OpCode 80)...")
-        val randFactor = BluetoothAuthEngine.generateRandomFactor()
-        val expectedResult = BluetoothAuthEngine.encrypt(randFactor)
+        isAuthenticating = true
+        try {
+            // L'officiel (BluetoothAuth.w) attend ~500ms après l'ouverture SPP avant l'auth,
+            // et certains modèles (ex: M75A LE Audio, cf. BluetoothAuth.h) n'exigent pas d'auth.
+            delay(350)
+            if (!isConnected()) {
+                println("EarbudsController: Auth skipped, already disconnected.")
+                return false
+            }
 
-        // 1. Send AuthCheckCmd (OpCode 80)
-        // Format: [version (1 byte = 0x01), random_factor (16 bytes)]
-        val authCheckPayload = byteArrayOf(0x01) + randFactor
-        val authCheckCmd = RcspPacket(
-            type = RcspPacket.TYPE_COMMAND,
-            hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
-            targetApp = RcspPacket.TARGET_APP_EARPHONE,
-            opCode = RcspPacket.CMD_AUTH_CHECK,
-            payload = authCheckPayload
-        )
+            println("EarbudsController: Starting Xiaomi Bluetooth Authentication Handshake (OpCode 80)...")
+            val randFactor = BluetoothAuthEngine.generateRandomFactor()
 
-        var verified = false
-        val resp80 = withTimeoutOrNull(2500) {
-            val job = async {
+            // 1. Stage 1: Phone challenges Earbuds (OpCode 80)
+            // Format: [version (1 byte = 0x01), random_factor (16 bytes)]
+            val authCheckPayload = byteArrayOf(0x01) + randFactor
+            val authCheckCmd = RcspPacket(
+                type = RcspPacket.TYPE_COMMAND,
+                hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
+                targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                opCode = RcspPacket.CMD_AUTH_CHECK,
+                opCodeSn = 1,
+                payload = authCheckPayload
+            )
+
+            var verified = false
+            val resp80 = withTimeoutOrNull(2500) {
+                val job = async {
+                    transport.incomingPackets.first { pkt ->
+                        pkt.opCode == RcspPacket.CMD_AUTH_CHECK && pkt.type == RcspPacket.TYPE_RESPONSE
+                    }
+                }
+                transport.send(authCheckCmd)
+                job.await()
+            }
+
+            if (resp80 != null) {
+                println("EarbudsController: Received AuthCheckResponse status=${resp80.status} payloadLen=${resp80.payload.size}")
+                if (resp80.status == 0 && resp80.payload.size >= 17) {
+                    val earbudResult = resp80.payload.copyOfRange(1, 17)
+                    verified = BluetoothAuthEngine.verifyResponse(randFactor, earbudResult)
+                    if (verified) {
+                        println("EarbudsController: SAFER+ E21 Auth Verified! Earbuds proved authentic.")
+                    } else {
+                        println("EarbudsController: WARNING: Result mismatch from earbuds!")
+                    }
+                }
+            } else {
+                println("EarbudsController: AuthCheck response timed out or skipped by earbud.")
+                return false
+            }
+
+            if (!isConnected()) {
+                println("EarbudsController: Socket closed during auth, skipping OpCode 81.")
+                return verified
+            }
+
+            // 2. Send AuthSendCalcResultCmd (OpCode 81)
+            val pairResult = if (verified) 0.toByte() else 1.toByte()
+            val authResultCmd = RcspPacket(
+                type = RcspPacket.TYPE_COMMAND,
+                hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
+                targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                opCode = RcspPacket.CMD_AUTH_SEND_CALC_RESULT,
+                opCodeSn = 2,
+                payload = byteArrayOf(0x01, pairResult)
+            )
+
+            val resp81 = withTimeoutOrNull(2000) {
+                val job = async {
+                    transport.incomingPackets.first { pkt ->
+                        pkt.opCode == RcspPacket.CMD_AUTH_SEND_CALC_RESULT && pkt.type == RcspPacket.TYPE_RESPONSE
+                    }
+                }
+                transport.send(authResultCmd)
+                job.await()
+            }
+
+            if (resp81 != null) {
+                println("EarbudsController: Received AuthSendCalcResultResponse status=${resp81.status}")
+            }
+
+            // 3. Stage 2: Wait for earbud challenge to phone (AUTH_STAGE_SELF -> AUTH_STAGE_OK)
+            println("EarbudsController: Waiting for earbud-initiated challenge (Stage 2)...")
+            val earbudChallenge = withTimeoutOrNull(3000) {
                 transport.incomingPackets.first { pkt ->
-                    pkt.opCode == RcspPacket.CMD_AUTH_CHECK && pkt.type == RcspPacket.TYPE_RESPONSE
+                    pkt.opCode == RcspPacket.CMD_AUTH_CHECK && pkt.type == RcspPacket.TYPE_COMMAND
                 }
             }
-            transport.send(authCheckCmd)
-            job.await()
-        }
+            if (earbudChallenge != null && earbudChallenge.payload.size >= 17) {
+                val earbudRand = earbudChallenge.payload.copyOfRange(1, 17)
+                val phoneEncrypted = BluetoothAuthEngine.encrypt(earbudRand)
+                val phoneResp80 = RcspPacket(
+                    type = RcspPacket.TYPE_RESPONSE,
+                    hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                    targetApp = earbudChallenge.targetApp,
+                    opCode = RcspPacket.CMD_AUTH_CHECK,
+                    opCodeSn = earbudChallenge.opCodeSn,
+                    status = 0,
+                    payload = byteArrayOf(0x01) + phoneEncrypted
+                )
+                transport.send(phoneResp80)
+                println("EarbudsController: Sent Phone AuthCheckResponse for Stage 2!")
 
-        if (resp80 != null) {
-            println("EarbudsController: Received AuthCheckResponse status=${resp80.status} payloadLen=${resp80.payload.size}")
-            if (resp80.status == 0 && resp80.payload.size >= 17) {
-                val earbudResult = resp80.payload.copyOfRange(1, 17)
-                verified = BluetoothAuthEngine.verifyResponse(randFactor, earbudResult)
-                if (verified) {
-                    println("EarbudsController: SAFER+ E21 Auth Verified! Earbuds proved authentic.")
-                } else {
-                    println("EarbudsController: WARNING: Result mismatch from earbuds!")
+                // Wait for earbud's OpCode 81 command
+                val earbudResultCmd = withTimeoutOrNull(2000) {
+                    transport.incomingPackets.first { pkt ->
+                        pkt.opCode == RcspPacket.CMD_AUTH_SEND_CALC_RESULT && pkt.type == RcspPacket.TYPE_COMMAND
+                    }
+                }
+                if (earbudResultCmd != null) {
+                    val phoneResp81 = RcspPacket(
+                        type = RcspPacket.TYPE_RESPONSE,
+                        hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                        targetApp = earbudResultCmd.targetApp,
+                        opCode = RcspPacket.CMD_AUTH_SEND_CALC_RESULT,
+                        opCodeSn = earbudResultCmd.opCodeSn,
+                        status = 0,
+                        payload = byteArrayOf(0x01) // versionResponse = 1
+                    )
+                    transport.send(phoneResp81)
+                    println("EarbudsController: Sent Phone AuthSendCalcResultResponse with versionResponse=1!")
                 }
             }
-        } else {
-            println("EarbudsController: AuthCheck response timed out or skipped by earbud.")
-        }
 
-        // 2. Send AuthSendCalcResultCmd (OpCode 81)
-        // Format: [version (1 byte = 0x01), pairResult (1 byte: 0 = success, 1 = fail)]
-        val pairResult = if (verified) 0.toByte() else 0.toByte()
-        val authResultCmd = RcspPacket(
-            type = RcspPacket.TYPE_COMMAND,
-            hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
-            targetApp = RcspPacket.TARGET_APP_EARPHONE,
-            opCode = RcspPacket.CMD_AUTH_SEND_CALC_RESULT,
-            payload = byteArrayOf(0x01, pairResult)
-        )
-
-        val resp81 = withTimeoutOrNull(2000) {
-            val job = async {
-                transport.incomingPackets.first { pkt ->
-                    pkt.opCode == RcspPacket.CMD_AUTH_SEND_CALC_RESULT && pkt.type == RcspPacket.TYPE_RESPONSE
-                }
-            }
-            transport.send(authResultCmd)
-            job.await()
+            println("EarbudsController: Authentication handshake finished! verified=$verified (AUTH_STAGE_OK)")
+            return verified
+        } finally {
+            isAuthenticating = false
         }
-
-        if (resp81 != null) {
-            println("EarbudsController: Received AuthSendCalcResultResponse status=${resp81.status}")
-        }
-        println("EarbudsController: Authentication handshake finished! verified=$verified")
-        return verified
     }
 
     private suspend fun onConnected() {
-        // Step 0: Perform Xiaomi challenge-response authentication handshake
+        // Step 0: Perform Xiaomi challenge-response authentication handshake (mutual two-stage).
         performAuthentication()
-        delay(80)
+        if (!isConnected()) {
+            println("EarbudsController: Disconnected during/after auth, aborting initial queries.")
+            return
+        }
+        delay(150)
+
+        // Helper local: envoie seulement si encore connecté, sinon aborte la séquence.
+        suspend fun sendOrAbort(packet: RcspPacket): Boolean {
+            if (!isConnected()) {
+                println("EarbudsController: Disconnected, aborting initial queries before opCode=${packet.opCode}.")
+                return false
+            }
+            transport.send(packet)
+            return true
+        }
 
         // 1. Query target info (name, version, battery, vid/pid) with standard 4-byte mask
         val targetInfoCmd = RcspPacket(
@@ -359,10 +467,10 @@ class EarbudsController(
             opCode = RcspPacket.CMD_GET_TARGET_INFO,
             payload = byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte())
         )
-        transport.send(targetInfoCmd)
-        delay(60)
+        if (!sendOrAbort(targetInfoCmd)) return
+        delay(150)
 
-        // 2. Query device run info (live ANC status)
+        // 2. Query device run info (dual-connection addresses, power mode)
         val runInfoCmd = RcspPacket(
             type = RcspPacket.TYPE_COMMAND,
             hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
@@ -370,11 +478,11 @@ class EarbudsController(
             opCode = RcspPacket.CMD_GET_DEVICE_RUN_INFO,
             payload = byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte())
         )
-        transport.send(runInfoCmd)
-        delay(60)
+        if (!sendOrAbort(runInfoCmd)) return
+        delay(150)
 
-        // 3. Query all device configs using official Xiaomi 16-bit Big-Endian batches
-        // Batch 1: Noise Control, Auto Noise, Personalized ANC, Remind Lost
+        // 3. Batched GET_DEVICE_CONFIG according to Xiaomi Official Architecture (IDeviceSettingInternal)
+        // Batch 1: Noise Cancellation configs
         val batch1 = OfficialPayloadCodecs.GetDeviceConfigCodec.encode(
             listOf(
                 ConfigId.NOISE_LEVEL_CHOOSE,
@@ -382,10 +490,11 @@ class EarbudsController(
                 ConfigId.AUTO_NOISE,
                 ConfigId.SMART_DENOISE_STATUS,
                 ConfigId.PERSONALIZED_NOISE_REDUCTION,
-                ConfigId.REMIND_LOST
+                ConfigId.REMIND_LOST,
+                ConfigId.COMMUTING_IMMERSE_STATUS
             )
         )
-        transport.send(
+        if (!sendOrAbort(
             RcspPacket(
                 type = RcspPacket.TYPE_COMMAND,
                 hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
@@ -393,14 +502,14 @@ class EarbudsController(
                 opCode = RcspPacket.CMD_GET_DEVICE_CONFIG,
                 payload = batch1
             )
-        )
-        delay(60)
+        )) return
+        delay(150)
 
         // Batch 2: Gestures & Clicks
         val batch2 = OfficialPayloadCodecs.GetDeviceConfigCodec.encode(
             listOf(ConfigId.CONFIG_CUSTOM_CLICK)
         )
-        transport.send(
+        if (!sendOrAbort(
             RcspPacket(
                 type = RcspPacket.TYPE_COMMAND,
                 hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
@@ -408,8 +517,8 @@ class EarbudsController(
                 opCode = RcspPacket.CMD_GET_DEVICE_CONFIG,
                 payload = batch2
             )
-        )
-        delay(60)
+        )) return
+        delay(150)
 
         // Batch 3: Equalizer, Spatial Audio & Sound features
         val batch3 = OfficialPayloadCodecs.GetDeviceConfigCodec.encode(
@@ -424,7 +533,7 @@ class EarbudsController(
                 ConfigId.NOTIFICATION_VOLUME
             )
         )
-        transport.send(
+        if (!sendOrAbort(
             RcspPacket(
                 type = RcspPacket.TYPE_COMMAND,
                 hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
@@ -432,7 +541,7 @@ class EarbudsController(
                 opCode = RcspPacket.CMD_GET_DEVICE_CONFIG,
                 payload = batch3
             )
-        )
+        )) return
         delay(60)
 
         // Batch 4: Connectivity & Detection Settings
@@ -446,7 +555,7 @@ class EarbudsController(
                 ConfigId.AIVS_WAKE_UP_SWITCH
             )
         )
-        transport.send(
+        if (!sendOrAbort(
             RcspPacket(
                 type = RcspPacket.TYPE_COMMAND,
                 hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
@@ -454,28 +563,15 @@ class EarbudsController(
                 opCode = RcspPacket.CMD_GET_DEVICE_CONFIG,
                 payload = batch4
             )
-        )
-        delay(60)
-
-        // Only send empty payload CMD_GET_DEVICE_CONFIG in simulation mode
-        if (isSimulated) {
-            transport.send(
-                RcspPacket(
-                    type = RcspPacket.TYPE_COMMAND,
-                    hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
-                    targetApp = RcspPacket.TARGET_APP_EARPHONE,
-                    opCode = RcspPacket.CMD_GET_DEVICE_CONFIG,
-                    payload = ByteArray(0)
-                )
-            )
-        }
-
-        // Start periodic sync polling every 8 seconds (Target info + Live ANC & Battery)
+        )) return
+        // 4. Start periodic sync polling every 8 seconds (Target info + Live ANC & Battery)
+        // Strictly conforms to official keepalive: OpCode 2 (battery, firmware) & OpCode 9 (MACs, power, ANC).
+        // Does NOT flood the device with unnecessary SET_DEVICE_CONFIG commands.
         periodicPollJob?.cancel()
         periodicPollJob = scope.launch {
             while (isActive && _connectionState.value == ConnectionState.CONNECTED) {
                 delay(8000)
-                // 1. Poll Target Info
+                // 1. Poll Target Info (Battery & Firmware)
                 transport.send(
                     RcspPacket(
                         type = RcspPacket.TYPE_COMMAND,
@@ -485,7 +581,7 @@ class EarbudsController(
                         payload = byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte())
                     )
                 )
-                // 2. Poll Run Info (live ANC mode)
+                // 2. Poll Run Info (Live ANC mode & run status)
                 transport.send(
                     RcspPacket(
                         type = RcspPacket.TYPE_COMMAND,
@@ -495,28 +591,27 @@ class EarbudsController(
                         payload = byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte())
                     )
                 )
-                // 3. Poll Noise Configs
-                transport.send(
-                    RcspPacket(
-                        type = RcspPacket.TYPE_COMMAND,
-                        hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
-                        targetApp = RcspPacket.TARGET_APP_EARPHONE,
-                        opCode = RcspPacket.CMD_GET_DEVICE_CONFIG,
-                        payload = batch1
-                    )
-                )
             }
         }
     }
 
     private fun onDisconnected() {
         periodicPollJob?.cancel()
+        if (_fitDetection.value.isRunning) {
+            fitDetectionTimeoutJob?.cancel()
+            fitDetectionTimeoutJob = null
+            FitDetectionAudioPlayer.stop()
+            _fitDetection.value = _fitDetection.value.copy(
+                status = FitDetectionState.STATUS_NOT_START,
+                errorCode = FitDetectionState.CODE_DISCONNECT
+            )
+        }
     }
 
     private fun handleIncomingPacket(packet: RcspPacket) {
-        // Specially handle earbud-initiated auth challenge before generic ACK
+        // 1. Specially handle earbud-initiated auth challenge before generic ACK
         if (packet.opCode == RcspPacket.CMD_AUTH_CHECK && packet.type == RcspPacket.TYPE_COMMAND) {
-            if (packet.payload.size >= 17) {
+            if (!isAuthenticating && packet.payload.size >= 17) {
                 val randFactor = packet.payload.copyOfRange(1, 17)
                 val encrypted = BluetoothAuthEngine.encrypt(randFactor)
                 val responsePayload = byteArrayOf(0x01) + encrypted
@@ -534,13 +629,52 @@ class EarbudsController(
             return
         }
 
-        // Automatically ACK any command sent by earbuds that expects a response
+        // 2. Specially handle earbud-initiated auth result command
+        if (packet.opCode == RcspPacket.CMD_AUTH_SEND_CALC_RESULT && packet.type == RcspPacket.TYPE_COMMAND) {
+            if (!isAuthenticating) {
+                val phoneResp81 = RcspPacket(
+                    type = RcspPacket.TYPE_RESPONSE,
+                    hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                    targetApp = packet.targetApp,
+                    opCode = RcspPacket.CMD_AUTH_SEND_CALC_RESULT,
+                    opCodeSn = packet.opCodeSn,
+                    status = 0,
+                    payload = byteArrayOf(0x01) // versionResponse = 1
+                )
+                scope.launch { transport.send(phoneResp81) }
+            }
+            return
+        }
+
+        // 3. Specially handle ReportEdrStatusCmd (OpCode 7): mirror the status payload
+        if (packet.opCode == 7 && packet.type == RcspPacket.TYPE_COMMAND) {
+            if (packet.hasResponse == RcspPacket.FLAG_HAVE_RESPONSE) {
+                val ack = RcspPacket.createAckResponse(packet, status = 0, payload = packet.payload)
+                scope.launch { transport.send(ack) }
+            }
+            return
+        }
+
+        // 4. Automatically ACK other commands that expect a response (FLAG_HAVE_RESPONSE)
         if (packet.type == RcspPacket.TYPE_COMMAND && packet.hasResponse == RcspPacket.FLAG_HAVE_RESPONSE) {
             val ack = RcspPacket.createAckResponse(packet, status = 0)
             scope.launch { transport.send(ack) }
         }
 
         when (packet.opCode) {
+            RcspPacket.CMD_SET_DEVICE_CONFIG -> {
+                // Réponse à nos SET (ex: level ANC config 11). Log pour debug, pas de parsing.
+                if (packet.type == RcspPacket.TYPE_RESPONSE) {
+                    val hex = packet.payload.joinToString(" ") { "%02X".format(it) }
+                    println("EarbudsController: SET_DEVICE_CONFIG response status=${packet.status} payload=[$hex]")
+                }
+            }
+            RcspPacket.CMD_SET_TARGET_INFO -> {
+                // Réponse à nos SET mode ANC (OpCode 8 VendorData type 4).
+                if (packet.type == RcspPacket.TYPE_RESPONSE) {
+                    println("EarbudsController: SET_TARGET_INFO (ANC mode) response status=${packet.status}")
+                }
+            }
             RcspPacket.CMD_GET_TARGET_INFO -> {
                 if (packet.status == 0 && packet.payload.isNotEmpty()) {
                     val info = TargetDeviceInfo.parseFromResponsePayload(packet.payload)
@@ -608,8 +742,11 @@ class EarbudsController(
                 if (packet.payload.isNotEmpty()) {
                     val configs = CommonConfig.parseList(packet.payload)
                     for (cfg in configs) {
+                        try {
                         when (cfg.type) {
-                            ConfigId.NOISE_LEVEL_CHOOSE, ConfigId.NOISE_MODE_CHOOSE, ConfigId.CONFIG_AUDIO_MODE,
+                            // NOTE: CONFIG_AUDIO_MODE (1) = Xiaomi/Dolby audio mode, PAS du ANC.
+                            // Le ANC passe par OpCode 8 (mode) + Config 11 (level) uniquement.
+                            ConfigId.NOISE_LEVEL_CHOOSE, ConfigId.NOISE_MODE_CHOOSE,
                             ConfigId.AUTO_NOISE, ConfigId.SMART_DENOISE_STATUS, ConfigId.PERSONALIZED_NOISE_REDUCTION -> {
                                 NoiseControlState.fromCommonConfig(cfg, _noiseControl.value)?.let {
                                     _noiseControl.value = it
@@ -638,9 +775,93 @@ class EarbudsController(
                                 val enabled = cfg.value.getOrNull(0)?.toInt() == 1
                                 _quickSettings.value = _quickSettings.value.copy(multipoint = enabled)
                             }
-                            ConfigId.EAR_CANAL_DETECTION -> {
-                                val enabled = cfg.value.getOrNull(0)?.toInt() == 1
-                                _quickSettings.value = _quickSettings.value.copy(inEarDetection = enabled)
+                            ConfigId.CONFIG_COMPACTNESS_LISTENER, ConfigId.EAR_CANAL_EAR_CANAL_FIT, ConfigId.EAR_CANAL_DETECTION -> {
+                                if (cfg.value.isNotEmpty()) {
+                                    val left = cfg.value[0].toInt() and 0xFF
+                                    val right = if (cfg.value.size > 1) cfg.value[1].toInt() and 0xFF else left
+
+                                    when {
+                                        left == FitDetectionState.CODE_RESPONSE_START || right == FitDetectionState.CODE_RESPONSE_START -> {
+                                            if (!FitDetectionAudioPlayer.isAudioPlaying()) {
+                                                FitDetectionAudioPlayer.play()
+                                            }
+                                            _fitDetection.value = _fitDetection.value.copy(
+                                                status = FitDetectionState.STATUS_DETECTING,
+                                                errorCode = FitDetectionState.CODE_NONE
+                                            )
+                                        }
+                                        left == FitDetectionState.CODE_EAR_OUT || right == FitDetectionState.CODE_EAR_OUT -> {
+                                            fitDetectionTimeoutJob?.cancel()
+                                            FitDetectionAudioPlayer.stop()
+                                            _fitDetection.value = _fitDetection.value.copy(
+                                                status = FitDetectionState.STATUS_NOT_START,
+                                                errorCode = FitDetectionState.CODE_EAR_OUT
+                                            )
+                                        }
+                                        left == FitDetectionState.CODE_CALLING || right == FitDetectionState.CODE_CALLING -> {
+                                            fitDetectionTimeoutJob?.cancel()
+                                            FitDetectionAudioPlayer.stop()
+                                            _fitDetection.value = _fitDetection.value.copy(
+                                                status = FitDetectionState.STATUS_NOT_START,
+                                                errorCode = FitDetectionState.CODE_CALLING
+                                            )
+                                        }
+                                        (left in 1..2 || left == FitDetectionState.FIT_ADJUST_POSITION) &&
+                                        (right in 1..2 || right == FitDetectionState.FIT_ADJUST_POSITION) -> {
+                                            fitDetectionTimeoutJob?.cancel()
+                                            FitDetectionAudioPlayer.stop()
+                                            _fitDetection.value = FitDetectionState(
+                                                status = FitDetectionState.STATUS_FINISH,
+                                                leftResult = left,
+                                                rightResult = right,
+                                                errorCode = FitDetectionState.CODE_NONE
+                                            )
+                                        }
+                                        else -> {
+                                            val fit = FitDetectionState.parseFromPayload(cfg.value)
+                                            if (fit.isFinished) {
+                                                fitDetectionTimeoutJob?.cancel()
+                                                FitDetectionAudioPlayer.stop()
+                                            }
+                                            _fitDetection.value = fit
+                                        }
+                                    }
+                                }
+                            }
+                            ConfigId.FIND_DEVICE -> {
+                                if (cfg.value.size >= 2) {
+                                    val state = cfg.value[0].toInt() and 0xFF
+                                    val devType = cfg.value[1].toInt() and 0xFF
+                                    val ringing = state == 1
+                                    when (devType) {
+                                        1 -> _findDevice.value = _findDevice.value.copy(isRingingLeft = ringing)
+                                        2 -> _findDevice.value = _findDevice.value.copy(isRingingRight = ringing)
+                                        3 -> _findDevice.value = FindDeviceState(isRingingLeft = ringing, isRingingRight = ringing)
+                                    }
+                                }
+                            }
+                            ConfigId.EARBOX_SOUND_CONFIG -> {
+                                if (cfg.value.isNotEmpty()) {
+                                    _earboxSound.value = EarboxSoundState.parseFromPayload(cfg.value)
+                                }
+                            }
+                            ConfigId.DEVICE_CALL_LISTENER -> {
+                                if (cfg.value.size >= 2) {
+                                    val isOpen = (cfg.value[0].toInt() and 0xFF) == 1
+                                    val secs = cfg.value[1].toInt() and 0xFF
+                                    _callListenerSeconds.value = if (isOpen) secs else 0
+                                }
+                            }
+                            ConfigId.DUAL_CONNECTION_SYNC -> {
+                                if (cfg.value.size >= 2) {
+                                    val subCmd = cfg.value[0].toInt() and 0xFF
+                                    val subVal = cfg.value[1].toInt() and 0xFF
+                                    if (subCmd == 0) {
+                                        _quickSettings.value = _quickSettings.value.copy(inEarDetection = subVal == 1)
+                                    } else if (subCmd == 1) {
+                                        _voiceHotword.value = subVal == 1
+                                    }
+                                }
                             }
                             ConfigId.ADAPTIVE_VOLUME -> {
                                 val enabled = cfg.value.getOrNull(0)?.toInt() == 1
@@ -681,13 +902,27 @@ class EarbudsController(
                                 _equalizer.value = _equalizer.value.copy(adaptiveSense = enabled)
                             }
                             ConfigId.NOTIFICATION_VOLUME -> {
-                                if (cfg.value.size >= 2) {
+                                // 1:1 DeviceConfigNotificationVolume : paramsToValue = [current] (1 byte),
+                                // valueToParams : len==4 -> current/recommended/max/min, sinon current = values[0].
+                                // Jamais 2 bytes [enabled, volume] : l'ancien format crashait (Index 1 oob)
+                                // dès qu'un firmware n'envoie qu'1 byte.
+                                if (cfg.value.isNotEmpty()) {
                                     _equalizer.value = _equalizer.value.copy(
-                                        notificationVolumeEnabled = cfg.value[0].toInt() == 1,
-                                        notificationVolume = cfg.value[1].toInt() and 0xFF
+                                        notificationVolume = cfg.value[0].toInt() and 0xFF
                                     )
                                 }
                             }
+                            ConfigId.COMMUTING_IMMERSE_STATUS -> {
+                                if (cfg.value.isNotEmpty()) {
+                                    _commutingImmerseMode.value = (cfg.value[0].toInt() and 0xFF).coerceIn(0, 3)
+                                }
+                            }
+
+                        }
+                        } catch (e: Exception) {
+                            // Prod : un payload inattendu (firmware plus récent/ancien) ne doit
+                            // jamais tuer le collector. On log et on passe à la config suivante.
+                            println("EarbudsController: Skipping malformed config type=${cfg.type} len=${cfg.value.size} ($e)")
                         }
                     }
                 }
@@ -703,24 +938,23 @@ class EarbudsController(
         val updated = _noiseControl.value.copy(mode = mode)
         _noiseControl.value = updated
 
-        val levelByte = when (mode) {
-            NoiseMode.OFF -> 0
-            NoiseMode.ANC -> updated.ancLevel.id
-            NoiseMode.TRANSPARENCY -> updated.transparencyLevel.id
-        }
-        sendNoiseConfig(mode.id, levelByte)
+        // Officiel (NoiseReductionVM.setNoiseType -> FunctionConfigImpl.updateNoise):
+        // le changement de MODE (OFF/ANC/Transparency) passe par OpCode 8 (SET_TARGET_INFO)
+        // avec VendorData [len=2, type=4, ancType]. JAMAIS par Config 11 ni Config 1.
+        // Config 11 (OpCode 242) ne sert qu'au choix du LEVEL (profondeur).
+        sendNoiseMode(mode.id)
     }
 
     fun setAncLevel(level: AncLevel) {
         val updated = _noiseControl.value.copy(mode = NoiseMode.ANC, ancLevel = level, ancLevelIndex = level.id)
         _noiseControl.value = updated
-        sendNoiseConfig(NoiseMode.ANC.id, level.id)
+        sendNoiseLevel(NoiseMode.ANC.id, level.id)
     }
 
     fun setTransparencyLevel(level: TransparencyLevel) {
         val updated = _noiseControl.value.copy(mode = NoiseMode.TRANSPARENCY, transparencyLevel = level, transparencyLevelIndex = level.id)
         _noiseControl.value = updated
-        sendNoiseConfig(NoiseMode.TRANSPARENCY.id, level.id)
+        sendNoiseLevel(NoiseMode.TRANSPARENCY.id, level.id)
     }
 
     fun setAutoNoise(enabled: Boolean) {
@@ -748,7 +982,7 @@ class EarbudsController(
             ancLevel = AncLevel.fromId(rawLevel)
         )
         _noiseControl.value = updated
-        sendNoiseConfig(NoiseMode.ANC.id, rawLevel)
+        sendNoiseLevel(NoiseMode.ANC.id, rawLevel)
     }
 
     fun setTransparencyLevelByIndex(index: Int, rawLevel: Int) {
@@ -758,7 +992,7 @@ class EarbudsController(
             transparencyLevel = TransparencyLevel.fromId(rawLevel)
         )
         _noiseControl.value = updated
-        sendNoiseConfig(NoiseMode.TRANSPARENCY.id, rawLevel)
+        sendNoiseLevel(NoiseMode.TRANSPARENCY.id, rawLevel)
     }
 
     fun setEqPreset(preset: EqPreset) {
@@ -815,15 +1049,126 @@ class EarbudsController(
         sendConfig(QuickSettings.createToggle(ConfigId.CONFIG_AUTO_ANSWER_PHONE, enabled))
     }
 
+    fun ringEarbud(target: RingTarget, start: Boolean) {
+        val cur = _findDevice.value
+        val updated = when (target) {
+            RingTarget.LEFT -> cur.copy(isRingingLeft = start)
+            RingTarget.RIGHT -> cur.copy(isRingingRight = start)
+            RingTarget.BOTH -> FindDeviceState(isRingingLeft = start, isRingingRight = start)
+        }
+        _findDevice.value = updated
+        sendConfig(FindDeviceState.createCommand(target, start))
+    }
+
     fun ringEarbuds(target: RingTarget) {
-        _findDevice.value = FindDeviceState(isRinging = true, target = target)
-        sendConfig(_findDevice.value.toCommonConfig())
+        val updated = when (target) {
+            RingTarget.LEFT -> FindDeviceState(isRingingLeft = true, isRingingRight = false)
+            RingTarget.RIGHT -> FindDeviceState(isRingingLeft = false, isRingingRight = true)
+            RingTarget.BOTH -> FindDeviceState(isRingingLeft = true, isRingingRight = true)
+        }
+        _findDevice.value = updated
+        sendConfig(FindDeviceState.createCommand(target, true))
     }
 
     fun stopRinging() {
-        _findDevice.value = _findDevice.value.copy(isRinging = false)
-        sendConfig(_findDevice.value.toCommonConfig())
+        _findDevice.value = FindDeviceState(isRingingLeft = false, isRingingRight = false)
+        sendConfig(FindDeviceState.createCommand(RingTarget.BOTH, false))
     }
+
+    fun startFitDetection() {
+        fitDetectionTimeoutJob?.cancel()
+        _fitDetection.value = FitDetectionState(
+            status = FitDetectionState.STATUS_DETECTING,
+            leftResult = FitDetectionState.FIT_UNKNOWN,
+            rightResult = FitDetectionState.FIT_UNKNOWN,
+            errorCode = FitDetectionState.CODE_NONE
+        )
+        FitDetectionAudioPlayer.play()
+        for (cmd in FitDetectionState.createCommands(start = true)) {
+            sendConfig(cmd)
+        }
+
+        // 10-second timeout matching official FitDetectionViewModel.java:360
+        fitDetectionTimeoutJob = scope.launch {
+            delay(10000L)
+            if (_fitDetection.value.isRunning) {
+                FitDetectionAudioPlayer.stop()
+                _fitDetection.value = _fitDetection.value.copy(
+                    status = FitDetectionState.STATUS_NOT_START,
+                    errorCode = FitDetectionState.CODE_TIMEOUT
+                )
+            }
+        }
+    }
+
+    fun stopFitDetection() {
+        fitDetectionTimeoutJob?.cancel()
+        fitDetectionTimeoutJob = null
+        FitDetectionAudioPlayer.stop()
+        _fitDetection.value = _fitDetection.value.copy(
+            status = FitDetectionState.STATUS_NOT_START,
+            errorCode = FitDetectionState.CODE_NONE
+        )
+        for (cmd in FitDetectionState.createCommands(start = false)) {
+            sendConfig(cmd)
+        }
+    }
+
+    fun setFitDetectionStatus(status: Int) {
+        _fitDetection.value = _fitDetection.value.copy(status = status)
+    }
+
+    fun dismissFitDetectionError() {
+        _fitDetection.value = _fitDetection.value.copy(errorCode = FitDetectionState.CODE_NONE)
+    }
+
+    fun setEarboxVolume(soundType: Int, volume: Int) {
+        val cur = _earboxSound.value
+        val updated = when (soundType) {
+            EarboxSoundState.SOUND_TYPE_OPEN -> cur.copy(openSound = cur.openSound.copy(volume = volume))
+            EarboxSoundState.SOUND_TYPE_CLOSE -> cur.copy(closeSound = cur.closeSound.copy(volume = volume))
+            EarboxSoundState.SOUND_TYPE_CHARGE -> cur.copy(chargeSound = cur.chargeSound.copy(volume = volume))
+            else -> cur
+        }
+        _earboxSound.value = updated
+        sendConfig(EarboxSoundState.createSetCommand(EarboxSoundState.SETTING_TYPE_VOLUME, soundType, volume))
+    }
+
+    fun setEarboxSoundId(soundType: Int, soundId: Int) {
+        val cur = _earboxSound.value
+        val updated = when (soundType) {
+            EarboxSoundState.SOUND_TYPE_OPEN -> cur.copy(openSound = cur.openSound.copy(soundId = soundId))
+            EarboxSoundState.SOUND_TYPE_CLOSE -> cur.copy(closeSound = cur.closeSound.copy(soundId = soundId))
+            EarboxSoundState.SOUND_TYPE_CHARGE -> cur.copy(chargeSound = cur.chargeSound.copy(soundId = soundId))
+            else -> cur
+        }
+        _earboxSound.value = updated
+        sendConfig(EarboxSoundState.createSetCommand(EarboxSoundState.SETTING_TYPE_SOUND, soundType, soundId))
+    }
+
+    fun setCallListener(seconds: Int) {
+        _callListenerSeconds.value = seconds
+        val isOpen = seconds > 0
+        sendConfig(CommonConfig(ConfigId.DEVICE_CALL_LISTENER, byteArrayOf(if (isOpen) 1 else 0, seconds.toByte())))
+    }
+
+    fun setVoiceHotword(enabled: Boolean) {
+        _voiceHotword.value = enabled
+        val payload = byteArrayOf(0x02, 0x02, if (enabled) 1 else 0)
+        scope.launch {
+            val packet = RcspPacket(
+                type = RcspPacket.TYPE_COMMAND,
+                hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
+                targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                opCode = RcspPacket.CMD_SET_TARGET_INFO,
+                status = 0,
+                payload = payload
+            )
+            transport.send(packet)
+        }
+    }
+
+
 
     fun setVirtualSurround(enabled: Boolean) {
         val updated = _equalizer.value.copy(virtualSurround = enabled)
@@ -844,15 +1189,18 @@ class EarbudsController(
     }
 
     fun setNotificationVolumeEnabled(enabled: Boolean) {
+        // Pas d'équivalent officiel : DeviceConfigNotificationVolume ne porte que [current].
+        // On mémorise localement sans envoyer de paquet inventé.
         val updated = _equalizer.value.copy(notificationVolumeEnabled = enabled)
         _equalizer.value = updated
-        sendConfig(CommonConfig(ConfigId.NOTIFICATION_VOLUME, byteArrayOf(if (enabled) 1 else 0, updated.notificationVolume.toByte())))
     }
 
     fun setNotificationVolume(volume: Int) {
+        // 1:1 SoundEffectVM.setNotificationVolume : DeviceConfigNotificationVolume.setCurrent
+        // -> CommonConfig(161, [current]) 1 byte unique.
         val updated = _equalizer.value.copy(notificationVolume = volume.coerceIn(0, 100))
         _equalizer.value = updated
-        sendConfig(CommonConfig(ConfigId.NOTIFICATION_VOLUME, byteArrayOf(if (updated.notificationVolumeEnabled) 1 else 0, updated.notificationVolume.toByte())))
+        sendConfig(CommonConfig(ConfigId.NOTIFICATION_VOLUME, byteArrayOf(updated.notificationVolume.toByte())))
     }
 
     fun setSpatialAudio(enabled: Boolean) {
@@ -935,6 +1283,11 @@ class EarbudsController(
         sendConfig(CommonConfig(OfficialConfigIds.REMIND_LOST, config.encode()))
     }
 
+    fun setCommutingImmerse(mode: Int) {
+        _commutingImmerseMode.value = mode.coerceIn(0, 3)
+        sendConfig(CommonConfig(ConfigId.COMMUTING_IMMERSE_STATUS, byteArrayOf(mode.toByte())))
+    }
+
     fun startOtaUpdate() {
         if (_otaState.value.isUpdating) return
         scope.launch {
@@ -954,9 +1307,12 @@ class EarbudsController(
 
     private fun sendConfig(config: CommonConfig) {
         scope.launch {
+            // Officiel: SetDeviceConfigHelper.sendDeviceConfigCmd -> SetDeviceConfigCmd
+            // (CommandWithParamAndResponse, type=2) => HAS_RESPONSE=1.
+            // Sans réponse uniquement pour BigData (config 52), jamais pour les réglages normaux.
             val packet = RcspPacket(
                 type = RcspPacket.TYPE_COMMAND,
-                hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
                 targetApp = RcspPacket.TARGET_APP_EARPHONE,
                 opCode = RcspPacket.CMD_SET_DEVICE_CONFIG,
                 payload = config.toByteArray()
@@ -965,19 +1321,43 @@ class EarbudsController(
         }
     }
 
-    private fun sendNoiseConfig(modeId: Int, level: Int) {
+    /**
+     * Changement de MODE ANC (OFF=0, ANC=1, Transparency=2).
+     * 1:1 officiel: FunctionConfigImpl.updateNoise -> sendSetRunInfo ->
+     * SetTargetInfoCmd(OpCode 8) avec VendorData [len=2, type=4, ancType], HAVE_RESPONSE.
+     * Voir com.mi.earphone.settings.ui.noise.NoiseReductionVM.setNoiseType.
+     */
+    private fun sendNoiseMode(modeId: Int) {
         scope.launch {
-            // Modern models (like Redmi Buds 6 Pro) listen to Config 1 (CONFIG_AUDIO_MODE)
-            // Other models listen to Config 11 (NOISE_LEVEL_CHOOSE)
-            val cfg1 = CommonConfig(ConfigId.CONFIG_AUDIO_MODE, byteArrayOf(modeId.toByte(), level.toByte()))
-            val cfg11 = CommonConfig(ConfigId.NOISE_LEVEL_CHOOSE, byteArrayOf(modeId.toByte(), level.toByte()))
-            val payload = cfg1.toByteArray() + cfg11.toByteArray()
+            val payload = OfficialPayloadCodecs.VendorDataCodec.encodeNoiseMode(modeId.toByte())
             val packet = RcspPacket(
                 type = RcspPacket.TYPE_COMMAND,
-                hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
+                targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                opCode = RcspPacket.CMD_SET_TARGET_INFO,
+                payload = payload
+            )
+            transport.send(packet)
+        }
+    }
+
+    /**
+     * Changement de LEVEL (profondeur ANC / variante transparency).
+     * 1:1 officiel: FunctionConfigImpl.noiseLevel -> DeviceConfigNoiseLevel(config 11)
+     * [ancState, ancLevel] unique, OpCode 242 (SET_DEVICE_CONFIG), HAVE_RESPONSE.
+     * Voir com.mi.earphone.bluetoothsdk.setting.function.DeviceConfigNoiseLevel(super(11)).
+     * Ne JAMAIS envoyer Config 1 (CONFIG_AUDIO_MODE = Xiaomi/Dolby, pas ANC !)
+     * ni concaténer 2 TLV dans le même paquet.
+     */
+    private fun sendNoiseLevel(modeId: Int, level: Int) {
+        scope.launch {
+            val cfg = CommonConfig(ConfigId.NOISE_LEVEL_CHOOSE, byteArrayOf(modeId.toByte(), level.toByte()))
+            val packet = RcspPacket(
+                type = RcspPacket.TYPE_COMMAND,
+                hasResponse = RcspPacket.FLAG_HAVE_RESPONSE,
                 targetApp = RcspPacket.TARGET_APP_EARPHONE,
                 opCode = RcspPacket.CMD_SET_DEVICE_CONFIG,
-                payload = payload
+                payload = cfg.toByteArray()
             )
             transport.send(packet)
         }

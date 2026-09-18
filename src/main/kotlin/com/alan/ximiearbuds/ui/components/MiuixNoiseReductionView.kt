@@ -9,6 +9,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -19,13 +20,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import com.alan.ximiearbuds.core.device.AncCapabilities
 import com.alan.ximiearbuds.core.protocol.AncLevel
 import com.alan.ximiearbuds.core.protocol.NoiseControlState
@@ -64,7 +68,7 @@ fun MiuixNoiseReductionView(
             .padding(horizontal = 12.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(cardBg)
-            .padding(vertical = 16.dp, horizontal = 16.dp)
+            .padding(vertical = 20.dp, horizontal = 16.dp)
     ) {
         // Row of Radio Buttons: Transparency (if supported), ANC, Off
         Row(
@@ -119,7 +123,7 @@ fun MiuixNoiseReductionView(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Adaptive / Smart Denoise Toggle Row (if supported)
+                // 1:1 switch_btn_smart_denoise : titre seul, pas de sous-titre.
                 if (capabilities.hasSmartDenoise || capabilities.hasAdaptiveAnc) {
                     Row(
                         modifier = Modifier
@@ -129,18 +133,12 @@ fun MiuixNoiseReductionView(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringRes("device_settings_smart_denoise"),
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = stringRes("device_settings_noise_reduction_adaptive_noise"),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-                            )
-                        }
+                        Text(
+                            text = stringRes("device_settings_smart_denoise"),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
 
                         Switch(
                             checked = noiseState.isSmartDenoise,
@@ -153,7 +151,7 @@ fun MiuixNoiseReductionView(
                     }
                 }
 
-                // Personalized ANC Toggle Row (if supported by device, e.g. 3012)
+                // 1:1 personalized_noise_reduction_switch : titre seul, pas de sous-titre.
                 if (capabilities.hasPersonalizedAnc) {
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
@@ -164,18 +162,12 @@ fun MiuixNoiseReductionView(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringRes("device_settings_personalized_noise_reduction"),
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = stringRes("device_settings_personalized_noise_reduction_desc"),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-                            )
-                        }
+                        Text(
+                            text = stringRes("device_settings_personalized_noise_reduction"),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
 
                         Switch(
                             checked = noiseState.isPersonalizedAnc,
@@ -188,53 +180,59 @@ fun MiuixNoiseReductionView(
                     }
                 }
 
-                // LevelDotView Stepped Slider (active if not smart denoise)
-                if (!noiseState.isSmartDenoise) {
+                // 1:1 levelContainer : 1 gear -> rien ; >9 gears -> slider continu + mild/deep ;
+                // sinon slider à crans + levelDes (référentiels reductionStr).
+                val ancGears = capabilities.ancLevels.ifEmpty { listOf(1, 0, 2) }
+                if (ancGears.size > 1) {
                     Spacer(modifier = Modifier.height(14.dp))
 
                     val depthDescription = when (noiseState.ancLevel) {
                         AncLevel.LIGHT -> stringRes("device_settings_mild")
                         AncLevel.BALANCED -> stringRes("device_settings_balanced")
                         AncLevel.DEEP, AncLevel.DEEP_PLUS -> stringRes("device_settings_deep")
-                        AncLevel.ADAPTIVE -> stringRes("device_settings_noise_reduction_adaptive_noise")
+                        AncLevel.ADAPTIVE -> stringRes("device_settings_noise_reduction_adaptive")
                         AncLevel.ANTIWIND -> stringRes("device_settings_wind_resistance")
                     }
 
-                    Text(
-                        text = depthDescription,
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = Color(0xFF007AFF),
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Stepped Dot Track matching device's official gears
-                    MiuixLevelDotView(
-                        currentLevel = noiseState.ancLevel,
-                        supportedGears = capabilities.ancLevels,
-                        onLevelSelected = onAncLevelChange
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = stringRes("device_settings_mild"),
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                    if (ancGears.size > 9) {
+                        OfficialNoiseSlider(
+                            gears = ancGears,
+                            selectedPos = ancGears.indexOf(noiseState.ancLevel.id).coerceAtLeast(0),
+                            showDots = false,
+                            showLevelDes = false,
+                            levelDesText = depthDescription,
+                            lowIconRes = "drawable/device_settings_reduct_low.webp",
+                            highIconRes = "drawable/device_settings_reduct_high.webp",
+                            enabled = !noiseState.isSmartDenoise,
+                            onLevelSelected = { onAncLevelChange(AncLevel.fromId(it)) }
                         )
-                        Text(
-                            text = stringRes("device_settings_deep"),
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = stringRes("device_settings_mild"),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp),
+                                color = Color(0xFF8C8C8C)
+                            )
+                            Text(
+                                text = stringRes("device_settings_deep"),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp),
+                                color = Color(0xFF8C8C8C)
+                            )
+                        }
+                    } else {
+                        OfficialNoiseSlider(
+                            gears = ancGears,
+                            selectedPos = ancGears.indexOf(noiseState.ancLevel.id).coerceAtLeast(0),
+                            showDots = true,
+                            showLevelDes = true,
+                            levelDesText = depthDescription,
+                            lowIconRes = "drawable/device_settings_reduct_low.webp",
+                            highIconRes = "drawable/device_settings_reduct_high.webp",
+                            enabled = !noiseState.isSmartDenoise,
+                            onLevelSelected = { onAncLevelChange(AncLevel.fromId(it)) }
                         )
                     }
                 }
@@ -256,42 +254,26 @@ fun MiuixNoiseReductionView(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Text(
-                        text = stringRes("device_settings_notification_transparency_mode"),
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
+                    // 1:1 transparence : même slider à crans + levelDes (transStr),
+                    // jamais de chips. 1 seul niveau -> rien (container masqué).
                     val tLevels = capabilities.transparencyLevels.ifEmpty { listOf(0, 1, 2) }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (0 in tLevels) {
-                            MiuixProfileChip(
-                                label = stringRes("device_settings_scene_standard"),
-                                selected = noiseState.transparencyLevel == TransparencyLevel.REGULAR,
-                                onClick = { onTransparencyLevelChange(TransparencyLevel.REGULAR) },
-                                modifier = Modifier.weight(1f)
-                            )
+                    if (tLevels.size > 1) {
+                        val transDescription = when (noiseState.transparencyLevel) {
+                            TransparencyLevel.REGULAR -> stringRes("device_settings_noise_reduction_transparent_standard")
+                            TransparencyLevel.VOCAL -> stringRes("device_settings_noise_reduction_transparent_person")
+                            TransparencyLevel.AMBIENT -> stringRes("device_settings_noise_reduction_transparent_environment")
                         }
-                        if (1 in tLevels) {
-                            MiuixProfileChip(
-                                label = stringRes("device_settings_noise_reduction_transparent_person"),
-                                selected = noiseState.transparencyLevel == TransparencyLevel.VOCAL,
-                                onClick = { onTransparencyLevelChange(TransparencyLevel.VOCAL) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        if (2 in tLevels) {
-                            MiuixProfileChip(
-                                label = stringRes("device_settings_noise_reduction_transparent_environment"),
-                                selected = noiseState.transparencyLevel == TransparencyLevel.AMBIENT,
-                                onClick = { onTransparencyLevelChange(TransparencyLevel.AMBIENT) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
+                        OfficialNoiseSlider(
+                            gears = tLevels,
+                            selectedPos = tLevels.indexOf(noiseState.transparencyLevel.id).coerceAtLeast(0),
+                            showDots = true,
+                            showLevelDes = true,
+                            levelDesText = transDescription,
+                            lowIconRes = "drawable/device_settings_trans_low.webp",
+                            highIconRes = "drawable/device_settings_trans_high.webp",
+                            enabled = true,
+                            onLevelSelected = { onTransparencyLevelChange(TransparencyLevel.fromId(it)) }
+                        )
                     }
                 }
             }
@@ -327,7 +309,9 @@ private fun MiuixNoiseRadioItem(
             Image(
                 painter = painterResource(if (isSelected) checkedDrawable else normalDrawable),
                 contentDescription = label,
-                modifier = Modifier.size(if (isSelected) 54.dp else 44.dp)
+                // 1:1 : même taille aux deux états (54dp = 162px @3x).
+                // L'anneau bleu du checked est DANS l'asset, pas de saut de layout.
+                modifier = Modifier.size(54.dp)
             )
         }
 
@@ -336,143 +320,150 @@ private fun MiuixNoiseRadioItem(
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall.copy(
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                fontSize = 12.sp
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp
             ),
-            color = if (isSelected) Color(0xFF007AFF) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
     }
 }
 
 /**
- * 1:1 Compose replica of official MIUI `LevelDotView.java`.
+ * 1:1 réplique de NoiseReductionView + LevelDotView.java officiels.
+ * - levelDes : 13sp text_color, centré (FontLatinMedium -> Medium).
+ * - SeekBar : fond #2f2e32 coins 33dp, progress transparent,
+ *   thumb = device_settings_ic_noise_reduction_btn.
+ * - LevelDotView : N dots (N = max+1), rayon 4dp, #8C8C8C, paddingHor 8dp,
+ *   dot sélectionné SAUTÉ (le thumb le recouvre) ; setData(max+1, progress).
+ * - Tap + drag avec snap au cran ; commit au relâcher (onStopTrackingTouch).
+ *
+ * @param gears liste des niveaux bruts du modèle (ex. [1,0,2]), dans l'ordre.
+ * @param selectedPos index courant dans [gears].
+ * @param onLevelSelected appelé avec le niveau BRUT sélectionné.
  */
 @Composable
-private fun MiuixLevelDotView(
-    currentLevel: AncLevel,
-    supportedGears: List<Int> = listOf(1, 0, 2),
-    onLevelSelected: (AncLevel) -> Unit
+private fun OfficialNoiseSlider(
+    gears: List<Int>,
+    selectedPos: Int,
+    showDots: Boolean,
+    showLevelDes: Boolean,
+    levelDesText: String,
+    lowIconRes: String,
+    highIconRes: String,
+    enabled: Boolean,
+    onLevelSelected: (Int) -> Unit
 ) {
-    val levels = supportedGears.map { gear ->
-        when (gear) {
-            1 -> AncLevel.LIGHT
-            0 -> AncLevel.BALANCED
-            2 -> AncLevel.DEEP
-            4 -> AncLevel.ANTIWIND
-            else -> AncLevel.BALANCED
-        }
-    }.ifEmpty { listOf(AncLevel.LIGHT, AncLevel.BALANCED, AncLevel.DEEP) }
+    val count = gears.size
+    val pos = selectedPos.coerceIn(0, count - 1)
+    val isDark = MaterialTheme.colorScheme.background.red < 0.5f
+    val trackColor = if (isDark) Color(0xFF2F2E32) else Color(0xFFE2E2E6)
+    val contentAlpha = if (enabled) 1f else 0.4f
 
-    val selectedIndex = levels.indexOf(currentLevel).coerceAtLeast(0)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Low Level Icon
-        Image(
-            painter = painterResource("drawable/device_settings_trans_low.webp"),
-            contentDescription = "Faible",
-            modifier = Modifier.size(16.dp)
-        )
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        // Stepped Track with Dots and Sliding Knob
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(36.dp)
-                .pointerInput(Unit) {
-                    detectTapGestures { offset ->
-                        val trackWidth = size.width
-                        val fraction = (offset.x / trackWidth).coerceIn(0f, 1f)
-                        val stepIndex = when {
-                            fraction < 0.33f -> 0
-                            fraction < 0.67f -> 1
-                            else -> 2
-                        }
-                        onLevelSelected(levels[stepIndex])
-                    }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            // Track bar
-            Canvas(modifier = Modifier.fillMaxWidth().height(4.dp)) {
-                drawRoundRect(
-                    color = Color(0x207F7F7F),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
-                )
-            }
-
-            // Dots along track
-            Row(
+    Column(modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = contentAlpha }) {
+        if (showLevelDes) {
+            Text(
+                text = levelDesText,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(lowIconRes),
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(7.dp))
+
+            var dragPos by remember(pos, count) { mutableStateOf(pos.toFloat()) }
+            var dragging by remember { mutableStateOf(false) }
+            val displayPos = if (dragging) dragPos else pos.toFloat()
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .pointerInput(count, enabled) {
+                        if (!enabled) return@pointerInput
+                        detectTapGestures { offset ->
+                            val f = (offset.x / size.width).coerceIn(0f, 1f)
+                            onLevelSelected(gears[(f * (count - 1)).roundToInt().coerceIn(0, count - 1)])
+                        }
+                    }
+                    .pointerInput(count, enabled) {
+                        if (!enabled || count < 2) return@pointerInput
+                        detectDragGestures(
+                            onDragStart = { dragging = true },
+                            onDragEnd = {
+                                dragging = false
+                                onLevelSelected(gears[dragPos.roundToInt().coerceIn(0, count - 1)])
+                            },
+                            onDragCancel = { dragging = false }
+                        ) { change, _ ->
+                            val f = (change.position.x / size.width).coerceIn(0f, 1f)
+                            dragPos = (f * (count - 1)).coerceIn(0f, (count - 1).toFloat())
+                        }
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                levels.forEachIndexed { index, _ ->
-                    val isChecked = index == selectedIndex
-                    Box(
-                        modifier = Modifier
-                            .size(if (isChecked) 18.dp else 12.dp)
-                            .clip(CircleShape)
-                            .background(if (isChecked) Color(0xFF007AFF) else Color(0x407F7F7F)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isChecked) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                            )
+                // Fond seekbar : pill #2f2e32 (device_settings_bg_noise_reduction_seekbar).
+                Canvas(modifier = Modifier.fillMaxWidth().height(6.dp)) {
+                    drawRoundRect(
+                        color = trackColor,
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
+                    )
+                }
+
+                if (showDots && count > 1) {
+                    // LevelDotView.onDraw : dots espacés sur (width - 2*paddingHor),
+                    // rayon 4dp, #8C8C8C, dot courant sauté (recouvert par le thumb).
+                    Canvas(modifier = Modifier.fillMaxWidth().height(40.dp)) {
+                        val dotR = 4.dp.toPx()
+                        val pad = 8.dp.toPx()
+                        val usable = size.width - pad * 2
+                        val gap = if (count > 1) (usable - count * dotR * 2) / (count - 1) else 0f
+                        val cy = size.height / 2
+                        val skip = displayPos.roundToInt().coerceIn(0, count - 1)
+                        for (i in 0 until count) {
+                            if (i == skip) continue
+                            val cx = pad + dotR + i * (dotR * 2 + gap)
+                            drawCircle(color = Color(0xFF8C8C8C), radius = dotR, center = Offset(cx, cy))
                         }
                     }
                 }
+
+                // Thumb officiel (device_settings_ic_noise_reduction_btn) au cran courant.
+                if (count > 1) {
+                    val f = (displayPos / (count - 1)).coerceIn(0f, 1f)
+                    Row(modifier = Modifier.fillMaxWidth().height(40.dp)) {
+                        if (f > 0f) Spacer(Modifier.weight(f).fillMaxHeight())
+                        Image(
+                            painter = painterResource("drawable/device_settings_ic_noise_reduction_btn.webp"),
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp).align(Alignment.CenterVertically)
+                        )
+                        if (f < 1f) Spacer(Modifier.weight(1f - f).fillMaxHeight())
+                    }
+                }
             }
+
+            Spacer(modifier = Modifier.width(7.dp))
+            Image(
+                painter = painterResource(highIconRes),
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
         }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        // High Level Icon
-        Image(
-            painter = painterResource("drawable/device_settings_trans_high.webp"),
-            contentDescription = "Fort",
-            modifier = Modifier.size(16.dp)
-        )
-    }
-}
-
-@Composable
-private fun MiuixProfileChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val isDark = MaterialTheme.colorScheme.background.red < 0.5f
-    val bg = if (selected) Color(0xFF007AFF) else if (isDark) Color(0xFF2A2A2E) else Color(0xFFF2F3F5)
-    val textCol = if (selected) Color.White else MaterialTheme.colorScheme.onSurface
-
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(vertical = 9.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall.copy(
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                fontSize = 12.sp
-            ),
-            color = textCol
-        )
     }
 }

@@ -118,11 +118,11 @@ private fun MiuixBatteryColumn(
 
         Spacer(modifier = Modifier.height(5.dp))
 
-        // Percentage Text (e.g. "85%" or "--")
+        // Percentage Text (DeviceSettingsCharge : 15sp FontRegular text_color)
         Text(
             text = percentage?.let { "$it%" } ?: "--",
             style = MaterialTheme.typography.bodyLarge.copy(
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.Normal,
                 fontSize = 15.sp
             ),
             color = MaterialTheme.colorScheme.onSurface
@@ -130,14 +130,14 @@ private fun MiuixBatteryColumn(
 
         Spacer(modifier = Modifier.height(2.dp))
 
-        // Subtitle Label (e.g. "Gauche", "Droite", "Boîtier")
+        // Subtitle Label (DeviceSettingsBattery : 12sp text_color_50 = 40%)
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Normal
             ),
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
         )
     }
 }

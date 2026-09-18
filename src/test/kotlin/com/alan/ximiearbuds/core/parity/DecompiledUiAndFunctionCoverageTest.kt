@@ -425,6 +425,24 @@ class DecompiledUiAndFunctionCoverageTest {
             desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixWelcomeGuideScreenKt",
             status = UiImplementationStatus.FULL_VIEW,
             description = "4-slide welcome presentation with official illustrations, skip, and feature highlights"
+        ),
+        OfficialUiScreenSpec(
+            name = "User Profile & Account Center",
+            officialPackage = "com.mi.earphone.mine",
+            officialClass = "MineFragment",
+            officialXmlLayout = "mine_fragment_mine.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixProfileScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
+            description = "User profile, Xiaomi account portal, avatar cache, region, and MIUI logout dialog"
+        ),
+        OfficialUiScreenSpec(
+            name = "Security Anti-Counterfeit Code Verification",
+            officialPackage = "com.mi.earphone.mine",
+            officialClass = "SecurityCodeFragment",
+            officialXmlLayout = "mine_fragment_security_code.xml",
+            desktopComponent = "com.alan.ximiearbuds.ui.screens.MiuixSecurityCodeScreenKt",
+            status = UiImplementationStatus.FULL_VIEW,
+            description = "20-digit security anti-counterfeiting verification against Xiaomi Cloud twswear API"
         )
     )
 
@@ -484,8 +502,8 @@ class DecompiledUiAndFunctionCoverageTest {
         }
         println("========================================================\n")
 
-        // Assert that we have at least verified all 26 screens exist and 100% full view
-        assertEquals(26, officialUiScreens.size)
-        assertEquals(26, fullViews)
+        // Assert that we have at least verified all 28 screens exist and 100% full view
+        assertEquals(28, officialUiScreens.size)
+        assertEquals(28, fullViews)
     }
 }

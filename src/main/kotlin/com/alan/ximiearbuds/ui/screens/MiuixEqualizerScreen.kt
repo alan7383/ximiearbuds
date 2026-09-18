@@ -208,7 +208,7 @@ fun MiuixEqualizerScreen(
                     )
 
                     Text(
-                        text = "-10 dB à +10 dB",
+                        text = "-10 dB ~ +10 dB",
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
                     )

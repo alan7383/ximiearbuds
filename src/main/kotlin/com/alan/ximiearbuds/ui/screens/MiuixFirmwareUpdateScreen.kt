@@ -85,7 +85,7 @@ fun MiuixFirmwareUpdateScreen(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "${stringRes("device_settings_version")} $currentVersion",
+                    text = "${stringRes("device_settings_device_firmware_version")} $currentVersion",
                     color = XiaomiTextSecondary,
                     fontSize = 13.sp
                 )
@@ -96,7 +96,7 @@ fun MiuixFirmwareUpdateScreen(
                 text = if (otaState.isLatest) {
                     stringRes("app_upgrade_no_newer_version")
                 } else {
-                    "${stringRes("device_settings_firmware_update_tip")} : v${otaState.latestVersion}"
+                    "${stringRes("device_settings_find_fw_new_version")} : v${otaState.latestVersion}"
                 },
                 color = if (otaState.isLatest) XiaomiGreen else XiaomiTextSecondary,
                 fontSize = 14.sp,
@@ -182,9 +182,9 @@ fun MiuixFirmwareUpdateScreen(
                 ) {
                     Text(
                         text = when {
-                            otaState.isUpdating -> "Mise à jour en cours..."
+                            otaState.isUpdating -> stringRes("appupgrade_upgradeing")
                             otaState.isLatest -> stringRes("app_upgrade_no_newer_version")
-                            else -> stringRes("appupgrade_now_update")
+                            else -> stringRes("device_settings_update_now")
                         },
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,

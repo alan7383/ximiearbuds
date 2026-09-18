@@ -69,6 +69,8 @@ fun MainWindow(
     val activeModel by controller.activeModel.collectAsState()
     val noiseControl by controller.noiseControl.collectAsState()
     val equalizer by controller.equalizer.collectAsState()
+    val otaState by controller.otaState.collectAsState()
+    val immerseMode by controller.commutingImmerseMode.collectAsState()
 
     val isConnected = connectionState == ConnectionState.CONNECTED
     val isWelcomeFinished = remember { DevicePreferences.isWelcomeFinished() }
@@ -189,6 +191,16 @@ fun MainWindow(
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
+
+                                MiuixUserAvatar(
+                                    size = 22.dp,
+                                    onClick = {
+                                        navStack.clear()
+                                        navStack.add(ScreenDestination.Profile)
+                                        currentScreen = AppScreen.DEVICE_SETTINGS
+                                    },
+                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                )
                             }
                         }
 
@@ -282,19 +294,12 @@ fun MainWindow(
 
                                     Spacer(modifier = Modifier.width(8.dp))
 
-                                    // user_avatar_iv: @drawable/avatar_default, 22dp circle
-                                    IconButton(
-                                        onClick = { showLangMenu = true },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Image(
-                                            painter = painterResource("drawable/avatar_default.png"),
-                                            contentDescription = "Avatar",
-                                            modifier = Modifier
-                                                .size(22.dp)
-                                                .clip(CircleShape)
-                                        )
-                                    }
+                                    // user_avatar_iv: @drawable/avatar_default, 22dp circle (MineApiKt.getMineApi().startMinePage())
+                                    MiuixUserAvatar(
+                                        size = 22.dp,
+                                        onClick = { navStack.add(ScreenDestination.Profile) },
+                                        modifier = Modifier.padding(horizontal = 4.dp)
+                                    )
                                 }
 
                                 // Scrollable Body: Replicates NestedScrollView in device_settings_fragment_device_settings.xml
@@ -333,7 +338,53 @@ fun MainWindow(
                                         )
                                     }
 
-                                    // 4. Function Group 1: Audio & Controls (function_layout1)
+                                    // 3b. Commuting immerse (function_commuting_immerse - 1009).
+                                    // 1:1 : carte TwoLine sans icône, visible ssi hasFunction(1009),
+                                    // sous-titre = mode courant, clic -> popup single-choice ancré.
+                                    if (currentModel.hasFunction(OfficialFunctionIds.FUNC_NOISE_IMMERSE)) {
+                                        var immerseMenuOpen by remember { mutableStateOf(false) }
+                                        val immerseOptions = listOf(
+                                            0 to stringRes("device_settings_commuting_immerse_item_close_mode"),
+                                            1 to stringRes("device_settings_commuting_immerse_item_flight_mode"),
+                                            2 to stringRes("device_settings_commuting_immerse_item_subway_mode"),
+                                            3 to stringRes("device_settings_commuting_immerse_item_HSR_mode")
+                                        )
+                                        Box(modifier = Modifier.padding(horizontal = 12.dp)) {
+                                            XiaomiCardContainer {
+                                                XiaomiActionItem(
+                                                    title = stringRes("device_settings_commuting_immerse"),
+                                                    subtitle = immerseOptions.firstOrNull { it.first == immerseMode }?.second
+                                                        ?: stringRes("device_settings_commuting_immerse_item_close_mode"),
+                                                    onClick = { immerseMenuOpen = true }
+                                                )
+                                            }
+                                            DropdownMenu(
+                                                expanded = immerseMenuOpen,
+                                                onDismissRequest = { immerseMenuOpen = false }
+                                            ) {
+                                                immerseOptions.forEach { (mode, label) ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(label) },
+                                                        trailingIcon = if (mode == immerseMode) {
+                                                            {
+                                                                Image(
+                                                                    painter = painterResource("drawable/icon_checked.png"),
+                                                                    contentDescription = null
+                                                                )
+                                                            }
+                                                        } else null,
+                                                        onClick = {
+                                                            immerseMenuOpen = false
+                                                            controller.setCommutingImmerse(mode)
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 4. Function Group 1: Audio & Controls (function_layout1).
+                                    // 1:1 : AUCUN divider entre items (le layout officiel n'en a pas).
                                     XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
                                         // Audio Recording / Transcription (function_record - 5003)
                                         if (currentModel.hasFunction(OfficialFunctionIds.FUNC_DEVICE_RECORD)) {
@@ -342,7 +393,6 @@ fun MainWindow(
                                                 iconRes = "drawable/device_settings_audio_record.png",
                                                 onClick = { navStack.add(ScreenDestination.VoiceTranslation) }
                                             )
-                                            XiaomiItemDivider()
                                         }
 
                                         // Translation (function_translate - 5008)
@@ -352,7 +402,6 @@ fun MainWindow(
                                                 iconRes = "drawable/device_settings_translate.png",
                                                 onClick = { navStack.add(ScreenDestination.VoiceTranslation) }
                                             )
-                                            XiaomiItemDivider()
                                         }
 
                                         // XiaoAI Voice Assistant (function_super_aivs - 5009 or voice control 3005)
@@ -362,7 +411,6 @@ fun MainWindow(
                                                 iconRes = "drawable/device_settings_aivs.png",
                                                 onClick = { navStack.add(ScreenDestination.XiaoAiSettings) }
                                             )
-                                            XiaomiItemDivider()
                                         }
 
                                         // Gesture operations (function_gesture - Group 4) -> Opens full MiuixGestureScreen
@@ -372,7 +420,6 @@ fun MainWindow(
                                                 iconRes = "drawable/device_settings_ic_gesture.webp",
                                                 onClick = { navStack.add(ScreenDestination.GestureControl) }
                                             )
-                                            XiaomiItemDivider()
                                         }
 
                                         // Sound settings / EQ (function_sound - Group 2) -> Opens full MiuixSoundEffectsScreen
@@ -383,7 +430,6 @@ fun MainWindow(
                                                 iconRes = "drawable/device_settings_ic_sound_settings.webp",
                                                 onClick = { navStack.add(ScreenDestination.SoundEffects) }
                                             )
-                                            XiaomiItemDivider()
                                         }
 
                                         // Laboratory (function_laboratory - Group 6) -> Opens full MiuixLaboratoryScreen
@@ -393,7 +439,6 @@ fun MainWindow(
                                                 iconRes = "drawable/device_settings_laboratory_function.png",
                                                 onClick = { navStack.add(ScreenDestination.Laboratory) }
                                             )
-                                            XiaomiItemDivider()
                                         }
 
                                         // More Settings (function_more_setting - Group 3) -> Opens full MiuixMoreSettingsScreen
@@ -406,7 +451,8 @@ fun MainWindow(
                                         }
                                     }
 
-                                    // 5. Function Group 2: Device Management (function_layout2)
+                                    // 5. Function Group 2: Device Management (function_layout2).
+                                    // 1:1 : pastille remind (7dp) sur firmware si MAJ dispo, pas de badge version.
                                     XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
                                         // Find Device (function 5001) -> Opens full MiuixFindDeviceScreen
                                         if (currentModel.hasFunction(OfficialFunctionIds.FUNC_FIND_DEVICE) || currentModel.hasFindDevice) {
@@ -415,13 +461,12 @@ fun MainWindow(
                                                 iconRes = "drawable/device_settings_ic_find_device.webp",
                                                 onClick = { navStack.add(ScreenDestination.FindDevice) }
                                             )
-                                            XiaomiItemDivider()
                                         }
 
                                         // Firmware Update -> Opens full MiuixFirmwareUpdateScreen
                                         XiaomiActionItem(
                                             title = stringRes("device_settings_firmware_update"),
-                                            badgeText = deviceInfo.versionName.ifBlank { "1.0.8.2" },
+                                            showRemindDot = !otaState.isLatest,
                                             iconRes = "drawable/device_settings_ic_firmware_update.webp",
                                             onClick = { navStack.add(ScreenDestination.FirmwareUpdate) }
                                         )
@@ -436,7 +481,6 @@ fun MainWindow(
                                                 onClick = { navStack.add(ScreenDestination.SportSettings) }
                                             )
                                             if (currentModel.hasFunction(OfficialFunctionIds.FUNC_EXERCISE_REPORT)) {
-                                                XiaomiItemDivider()
                                                 XiaomiActionItem(
                                                     title = stringRes("device_settings_exercise_report"),
                                                     iconRes = "drawable/device_settings_ic_exercise.png",
@@ -446,15 +490,15 @@ fun MainWindow(
                                         }
                                     }
 
-                                    // Function Group: Dongle (function_dongle_layout - Group 7)
+                                    // Function Group: Dongle (function_dongle_layout - Group 7).
+                                    // 1:1 : icône = device_settings_dongle_settings_icon (via usb_settings_bg).
                                     if (currentModel.hasGroup(OfficialGroupIds.GROUP_USB) || currentModel.hasDongle) {
                                         XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
                                             XiaomiActionItem(
                                                 title = stringRes("device_settings_dongle_settings"),
-                                                iconRes = "drawable/dongle_settings_volume_normal.png",
+                                                iconRes = "drawable/device_settings_dongle_settings_icon.png",
                                                 onClick = { navStack.add(ScreenDestination.DongleSettings) }
                                             )
-                                            XiaomiItemDivider()
                                             XiaomiActionItem(
                                                 title = stringRes("device_settings_usb_firmware_update"),
                                                 iconRes = "drawable/device_settings_usb_update.webp",
@@ -463,32 +507,29 @@ fun MainWindow(
                                         }
                                     }
 
-                                    // Function Group: Help & About (matching device_settings_item_function_layout.xml)
+                                    // Function Group: Help & About (matching device_settings_item_function_layout.xml).
+                                    // 1:1 : AUCUN divider entre items.
                                     XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
                                         XiaomiActionItem(
                                             title = stringRes("device_settings_beginner_guide"),
                                             iconRes = "drawable/device_settings_function_guide.png",
                                             onClick = { currentScreen = AppScreen.WELCOME }
                                         )
-                                        XiaomiItemDivider()
                                         XiaomiActionItem(
                                             title = stringRes("device_settings_device_introduce"),
                                             iconRes = "drawable/device_settings_introduce.webp",
                                             onClick = { navStack.add(ScreenDestination.DeviceInfo) }
                                         )
-                                        XiaomiItemDivider()
                                         XiaomiActionItem(
                                             title = stringRes("device_settings_questions_answers"),
                                             iconRes = "drawable/device_settings_ic_faq.webp",
                                             onClick = { navStack.add(ScreenDestination.MoreSettings) }
                                         )
-                                        XiaomiItemDivider()
                                         XiaomiActionItem(
                                             title = stringRes("device_settings_anti_disconnect_protection"),
                                             iconRes = "drawable/device_settings_ic_disconnect_protect.webp",
                                             onClick = { navStack.add(ScreenDestination.MoreSettings) }
                                         )
-                                        XiaomiItemDivider()
                                         XiaomiActionItem(
                                             title = stringRes("device_settings_about_device"),
                                             iconRes = "drawable/device_settings_ic_about_device.webp",
@@ -543,12 +584,14 @@ fun MainWindow(
 
                             ScreenDestination.FitDetection -> {
                                 MiuixFitDetectionScreen(
+                                    controller = controller,
                                     onBackClick = { navStack.removeLast() }
                                 )
                             }
 
                             ScreenDestination.EarboxSound -> {
                                 MiuixEarboxSoundScreen(
+                                    controller = controller,
                                     onBackClick = { navStack.removeLast() }
                                 )
                             }
@@ -624,6 +667,31 @@ fun MainWindow(
                             ScreenDestination.BeginnerGuide -> {
                                 MiuixWelcomeGuideScreen(
                                     onFinish = { navStack.removeLast() }
+                                )
+                            }
+
+                            ScreenDestination.Profile -> {
+                                MiuixProfileScreen(
+                                    onBackClick = {
+                                        if (navStack.size > 1) {
+                                            navStack.removeLast()
+                                        } else {
+                                            navStack.clear()
+                                            navStack.add(ScreenDestination.MainSettings)
+                                            if (!isConnected && activeModel == null) {
+                                                currentScreen = AppScreen.EMPTY
+                                            }
+                                        }
+                                    },
+                                    onNavigateToSecurityCode = { navStack.add(ScreenDestination.SecurityCode) },
+                                    currentLanguage = currentLanguage,
+                                    onLanguageSelected = onLanguageSelected
+                                )
+                            }
+
+                            ScreenDestination.SecurityCode -> {
+                                MiuixSecurityCodeScreen(
+                                    onBackClick = { navStack.removeLast() }
                                 )
                             }
 

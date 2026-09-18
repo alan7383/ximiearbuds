@@ -1979,5 +1979,18 @@
   "wednesday_shortest": "Wed",
   "weibo_application_id": "",
   "weibo_redirect_uri": "",
-  "yesterday": "Yesterday"
+  "yesterday": "Yesterday",
+  "device_manager_demo_mode": "Test in demo mode (without Bluetooth)",
+  "device_settings_meter": "%1$dm",
+  "super_aivs_tune_honey": "Honey (蜜糖)",
+  "super_aivs_tune_galaxy": "Galaxy (星河)",
+  "device_settings_skin_white": "Pure White",
+  "device_settings_skin_black": "Graphite Black",
+  "device_settings_skin_silver": "Frosted Silver",
+  "device_settings_skin_blue": "Celestial Blue",
+  "device_settings_skin_gold": "Special Edition",
+  "device_settings_skin_titanium": "Natural Titanium",
+  "device_settings_skin_green": "Aurora Green",
+  "mine_user_agreement_content": "Xiaomi Earbuds User Agreement:\n\n1. Acceptance of Terms: By using Xiaomi Earbuds, you agree to be bound by this user agreement.\n2. Use of Service: You may manage and customize features of your compatible Xiaomi wireless earphones.\n3. Updates: The application may automatically check and apply firmware updates to maintain device security and stability.\n4. Intellectual Property: All trademarks, logos, and software remain the exclusive property of Xiaomi Inc.",
+  "mine_user_privacy_policy_content": "Xiaomi Earbuds Privacy Policy:\n\n1. Data Collection: We only collect information necessary for the operation of your devices (battery levels, audio settings, ANC profiles).\n2. Security: All Bluetooth communications are encrypted using secure Xiaomi RCSP protocols.\n3. Local Processing: Your equalizer settings and gesture command assignments are stored locally on your computer.\n4. Revocation: You may revoke your consent at any time in the profile settings."
 }

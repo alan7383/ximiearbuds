@@ -196,7 +196,7 @@ fun XiaomiScanDeviceView(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (connectionState == ConnectionState.CONNECTING) "Connexion en cours…" else matchingDevice.address,
+                                text = if (connectionState == ConnectionState.CONNECTING) stringRes("device_manager_connecting") else matchingDevice.address,
                                 fontSize = 12.sp,
                                 color = if (connectionState == ConnectionState.CONNECTING) XiaomiCyan else XiaomiTextMuted
                             )
@@ -213,7 +213,7 @@ fun XiaomiScanDeviceView(
                             enabled = connectionState != ConnectionState.CONNECTING
                         ) {
                             Text(
-                                text = if (connectionState == ConnectionState.CONNECTING) "…" else "Connecter",
+                                text = if (connectionState == ConnectionState.CONNECTING) "…" else stringRes("device_connect_device"),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -260,7 +260,7 @@ fun XiaomiScanDeviceView(
                     enabled = connectionState != ConnectionState.CONNECTING
                 ) {
                     Text(
-                        text = if (connectionState == ConnectionState.CONNECTING) "Connexion en cours…" else "Connecter ${matchingDevice.name}",
+                        text = if (connectionState == ConnectionState.CONNECTING) stringRes("device_manager_connecting") else "${stringRes("device_connect_device")} ${matchingDevice.name}",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -294,7 +294,7 @@ fun XiaomiScanDeviceView(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "Tester en mode démo (sans Bluetooth)",
+                    text = stringRes("device_manager_demo_mode"),
                     color = XiaomiTextMuted,
                     fontSize = 12.5.sp
                 )

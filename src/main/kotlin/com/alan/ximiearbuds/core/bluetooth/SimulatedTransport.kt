@@ -156,11 +156,66 @@ class SimulatedTransport(
                                 simulatedQuick = simulatedQuick.copy(multipoint = cfg.value.getOrNull(0)?.toInt() == 1)
                             }
                             ConfigId.EAR_CANAL_DETECTION -> {
-                                simulatedQuick = simulatedQuick.copy(inEarDetection = cfg.value.getOrNull(0)?.toInt() == 1)
+                                val isStart = cfg.value.getOrNull(0)?.toInt() == 1
+                                if (isStart) {
+                                    scope.launch {
+                                        delay(1500)
+                                        // Emit fit detection result: Left Well (1), Right Well (1)
+                                        val fitResp = CommonConfig(ConfigId.EAR_CANAL_DETECTION, byteArrayOf(1, 1))
+                                        val packetResp = RcspPacket(
+                                            type = RcspPacket.TYPE_COMMAND,
+                                            hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                                            targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                                            opCode = RcspPacket.CMD_NOTIFY_DEVICE_CONFIG,
+                                            opCodeSn = 0,
+                                            status = 0,
+                                            payload = CommonConfig.toByteArray(listOf(fitResp))
+                                        )
+                                        _incomingPackets.emit(packetResp)
+                                    }
+                                }
+                            }
+                            ConfigId.FIND_DEVICE -> {
+                                if (cfg.value.size >= 2) {
+                                    val notifyCfg = CommonConfig(ConfigId.FIND_DEVICE, cfg.value)
+                                    val packetResp = RcspPacket(
+                                        type = RcspPacket.TYPE_COMMAND,
+                                        hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                                        targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                                        opCode = RcspPacket.CMD_NOTIFY_DEVICE_CONFIG,
+                                        opCodeSn = 0,
+                                        status = 0,
+                                        payload = CommonConfig.toByteArray(listOf(notifyCfg))
+                                    )
+                                    scope.launch { _incomingPackets.emit(packetResp) }
+                                }
+                            }
+                            ConfigId.EARBOX_SOUND_SET -> {
+                                if (cfg.value.size >= 3) {
+                                    val setType = cfg.value[0].toInt() and 0xFF
+                                    val soundType = cfg.value[1].toInt() and 0xFF
+                                    val value = cfg.value[2].toInt() and 0xFF
+                                    // Generate earbox sound config notification
+                                    val open = byteArrayOf(0, 1, 75, 100)
+                                    val close = byteArrayOf(1, 1, 75, 100)
+                                    val charge = byteArrayOf(2, 1, 75, 100)
+                                    val notifyCfg = CommonConfig(ConfigId.EARBOX_SOUND_CONFIG, open + close + charge)
+                                    val packetResp = RcspPacket(
+                                        type = RcspPacket.TYPE_COMMAND,
+                                        hasResponse = RcspPacket.FLAG_NO_RESPONSE,
+                                        targetApp = RcspPacket.TARGET_APP_EARPHONE,
+                                        opCode = RcspPacket.CMD_NOTIFY_DEVICE_CONFIG,
+                                        opCodeSn = 0,
+                                        status = 0,
+                                        payload = CommonConfig.toByteArray(listOf(notifyCfg))
+                                    )
+                                    scope.launch { _incomingPackets.emit(packetResp) }
+                                }
                             }
                             ConfigId.ADAPTIVE_VOLUME -> {
                                 simulatedQuick = simulatedQuick.copy(adaptiveVolume = cfg.value.getOrNull(0)?.toInt() == 1)
                             }
+
                         }
                     }
 

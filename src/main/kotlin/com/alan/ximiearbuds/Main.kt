@@ -12,12 +12,17 @@ import com.alan.ximiearbuds.ui.theme.AppLanguage
 import com.alan.ximiearbuds.ui.theme.XimiEarbudsTheme
 import java.awt.Dimension
 
-fun main() = application {
+fun main(args: Array<String>) = application {
     val windowState = rememberWindowState(width = 460.dp, height = 860.dp)
-    val controller = remember { EarbudsController() }
+    val controller = remember { EarbudsController(autoConnectOnStartup = "--demo" !in args) }
 
     var isDarkTheme by remember { mutableStateOf(true) }
     var currentLanguage by remember { mutableStateOf(AppLanguage.FR) }
+
+    // Mode démo headless (screenshots / tests UI sans écouteurs) : --demo
+    LaunchedEffect(Unit) {
+        if ("--demo" in args) controller.setDemoMode(true)
+    }
 
     Window(
         onCloseRequest = {

@@ -34,6 +34,15 @@ object DevicePreferences {
     private var lastUsedDevice: String? = null
     private var isWelcomeFinished: Boolean = false
 
+    // Profile & Account State (1:1 with official Xiaomi Account Manager)
+    private var isLoggedIn: Boolean = false
+    private var userId: String? = null
+    private var userName: String? = null
+    private var avatarAddress: String? = null
+    private var region: String = "France"
+    private var userExperienceAccepted: Boolean = true
+    private var deviceAssociated: Boolean = true
+
     init {
         loadSettings()
     }
@@ -49,6 +58,16 @@ object DevicePreferences {
                 val root = jsonParser.parseToJsonElement(content).jsonObject
                 lastUsedDevice = root["lastUsedDevice"]?.jsonPrimitive?.contentOrNull
                 isWelcomeFinished = root["welcomeFinished"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: false
+                
+                // Load account state
+                isLoggedIn = root["isLoggedIn"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: false
+                userId = root["userId"]?.jsonPrimitive?.contentOrNull
+                userName = root["userName"]?.jsonPrimitive?.contentOrNull
+                avatarAddress = root["avatarAddress"]?.jsonPrimitive?.contentOrNull
+                region = root["region"]?.jsonPrimitive?.contentOrNull ?: "France"
+                userExperienceAccepted = root["userExperienceAccepted"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: true
+                deviceAssociated = root["deviceAssociated"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: true
+
                 val colors = root["colors"]?.jsonObject
                 colors?.forEach { (mac, elem) ->
                     val c = elem.jsonPrimitive.intOrNull
@@ -68,6 +87,13 @@ object DevicePreferences {
                 val json = buildJsonObject {
                     lastUsedDevice?.let { put("lastUsedDevice", it) }
                     put("welcomeFinished", isWelcomeFinished)
+                    put("isLoggedIn", isLoggedIn)
+                    userId?.let { put("userId", it) }
+                    userName?.let { put("userName", it) }
+                    avatarAddress?.let { put("avatarAddress", it) }
+                    put("region", region)
+                    put("userExperienceAccepted", userExperienceAccepted)
+                    put("deviceAssociated", deviceAssociated)
                     put("colors", buildJsonObject {
                         colorMap.forEach { (mac, color) ->
                             put(mac, color)
@@ -110,6 +136,63 @@ object DevicePreferences {
         if (address.isBlank() || lastUsedDevice == address) return
         lastUsedDevice = address
         saveSettingsAsync()
+    }
+
+    // ==========================================
+    // Account & Profile Management (Xiaomi Account 1:1)
+    // ==========================================
+
+    fun isLoggedIn(): Boolean = isLoggedIn
+    fun getUserId(): String? = userId
+    fun getUserName(): String? = userName
+    fun getAvatarAddress(): String? = avatarAddress
+    fun getRegion(): String = region
+    fun isUserExperienceAccepted(): Boolean = userExperienceAccepted
+    fun isDeviceAssociated(): Boolean = deviceAssociated
+
+    fun login(id: String, name: String, avatar: String? = null) {
+        isLoggedIn = true
+        userId = id
+        userName = name
+        avatarAddress = avatar
+        saveSettingsAsync()
+    }
+
+    fun saveAccountInfo(isLoggedIn: Boolean, userId: String, userName: String, avatarAddress: String = "") {
+        this.isLoggedIn = isLoggedIn
+        this.userId = userId.ifEmpty { null }
+        this.userName = userName.ifEmpty { null }
+        this.avatarAddress = avatarAddress.ifEmpty { null }
+        saveSettingsAsync()
+    }
+
+    fun logout() {
+        isLoggedIn = false
+        userId = null
+        userName = null
+        avatarAddress = null
+        saveSettingsAsync()
+    }
+
+    fun setRegion(newRegion: String) {
+        if (newRegion.isNotBlank() && region != newRegion) {
+            region = newRegion
+            saveSettingsAsync()
+        }
+    }
+
+    fun setUserExperienceAccepted(accepted: Boolean) {
+        if (userExperienceAccepted != accepted) {
+            userExperienceAccepted = accepted
+            saveSettingsAsync()
+        }
+    }
+
+    fun setDeviceAssociated(associated: Boolean) {
+        if (deviceAssociated != associated) {
+            deviceAssociated = associated
+            saveSettingsAsync()
+        }
     }
 
     /**

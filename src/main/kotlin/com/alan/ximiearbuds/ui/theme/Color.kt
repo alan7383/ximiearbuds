@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 
 // Authentic Xiaomi MIUI / HyperOS Palette (from decompiled APK)
 val XiaomiPageBg = Color(0xFF000000)
+val XiaomiSurface = XiaomiPageBg
 val XiaomiCardBg = Color(0xFF191919)
 val XiaomiCardHover = Color(0xFF242424)
 val XiaomiCardBorder = Color(0x1AFFFFFF)

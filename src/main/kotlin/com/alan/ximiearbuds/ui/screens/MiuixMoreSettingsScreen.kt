@@ -48,9 +48,9 @@ fun MiuixMoreSettingsScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
     var showRemoveDialog by remember { mutableStateOf(false) }
-    var speechToChat by remember { mutableStateOf(false) }
-    var autoPickCall by remember { mutableStateOf(false) }
-    var voiceHotword by remember { mutableStateOf(false) }
+    val voiceHotword by controller.voiceHotword.collectAsState()
+    val callListenerSeconds by controller.callListenerSeconds.collectAsState()
+    val speechToChat = callListenerSeconds > 0
 
     Column(
         modifier = modifier
@@ -88,13 +88,13 @@ fun MiuixMoreSettingsScreen(
                 XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
                     var hasPrevious = false
 
-                    // Speech-to-Chat / Conversation libre (handsFreeView - 3001)
+                    // Speech-to-Chat / Conversation libre (handsFreeView - 3001 / Config 13)
                     if (model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_SMART_FREE_PICK)) {
                         XiaomiSwitchItem(
                             title = stringRes("device_settings_hands_free"),
                             subtitle = stringRes("device_settings_limpid_desc"),
                             checked = speechToChat,
-                            onCheckedChange = { speechToChat = it }
+                            onCheckedChange = { controller.setCallListener(if (it) 5 else 0) }
                         )
                         hasPrevious = true
                     }
@@ -135,26 +135,26 @@ fun MiuixMoreSettingsScreen(
                         hasPrevious = true
                     }
 
-                    // Auto Pick Call (3008)
+                    // Auto Pick Call (3008 / Config 3)
                     if (model.moreSettingsCapabilities.hasAutoPickCall || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_AUTO_PICK_CALL)) {
                         if (hasPrevious) XiaomiItemDivider()
                         XiaomiSwitchItem(
                             title = stringRes("device_settings_auto_pick_call"),
-                            subtitle = stringRes("device_settings_auto_pick_call_desc"),
-                            checked = autoPickCall,
-                            onCheckedChange = { autoPickCall = it }
+                            subtitle = stringRes("device_settings_auto_pick_call_suntitle"),
+                            checked = quickSettings.autoAnswerPhone,
+                            onCheckedChange = { controller.setAutoAnswer(it) }
                         )
                         hasPrevious = true
                     }
 
-                    // Voice Control Hotword (3005)
+                    // Voice Control Hotword (3005 / VendorData type 2 / Config 126)
                     if (model.moreSettingsCapabilities.hasVoiceControl || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_VOICE_CONTROL)) {
                         if (hasPrevious) XiaomiItemDivider()
                         XiaomiSwitchItem(
                             title = stringRes("device_settings_voice_control"),
                             subtitle = stringRes("device_settings_voice_control_detail"),
                             checked = voiceHotword,
-                            onCheckedChange = { voiceHotword = it }
+                            onCheckedChange = { controller.setVoiceHotword(it) }
                         )
                         hasPrevious = true
                     }
@@ -196,7 +196,7 @@ fun MiuixMoreSettingsScreen(
                     if ((model.moreSettingsCapabilities.hasDongle || model.hasFunction(com.alan.ximiearbuds.core.protocol.OfficialFunctionIds.FUNC_USB_MODE)) && onNavigateToDongle != null) {
                         if (hasPrevious) XiaomiItemDivider()
                         XiaomiActionItem(
-                            title = stringRes("device_settings_dongle_mode"),
+                            title = stringRes("device_settings_usb_mode"),
                             subtitle = stringRes("device_settings_dongle_gesture_notify"),
                             onClick = onNavigateToDongle
                         )

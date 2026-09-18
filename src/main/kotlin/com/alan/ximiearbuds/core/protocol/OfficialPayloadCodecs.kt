@@ -296,7 +296,8 @@ object OfficialPayloadCodecs {
     data class DongleConfig(
         val dongleMode: Int = 1, // 0 = Lossless, 1 = Low Latency, 2 = Wireless Mic
         val monitorSwitch: Boolean = false,
-        val monitorVolume: Int = 50 // 0-100
+        val monitorVolume: Int = 50, // 0-100
+        val dongleInserted: Boolean = true
     ) {
         fun encodeMode(): ByteArray = byteArrayOf(dongleMode.toByte())
         fun encodeMonitor(): ByteArray = byteArrayOf(if (monitorSwitch) 1 else 0, monitorVolume.coerceIn(0, 100).toByte())

@@ -55,7 +55,7 @@ fun MiuixDeviceInfoScreen(
 
             // Section Header: Matériel
             Text(
-                text = stringRes("device_settings_equipment_manual").uppercase(),
+                text = stringRes("device_settings_about_device").uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -66,13 +66,13 @@ fun MiuixDeviceInfoScreen(
             )
 
             XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
-                MiuixInfoRow("Modèle", activeModel?.commercialName ?: deviceInfo.name)
+                MiuixInfoRow(stringRes("device_settings_device_model"), activeModel?.commercialName ?: deviceInfo.name)
                 XiaomiItemDivider()
-                MiuixInfoRow("Code modèle", activeModel?.modelCode?.ifEmpty { activeModel.codename } ?: "M2110E1")
+                MiuixInfoRow(stringRes("device_settings_device_mac"), deviceInfo.address.ifEmpty { "11:22:33:44:55:66" })
                 XiaomiItemDivider()
-                MiuixInfoRow("Identifiants USB/BT", "VID 0x${deviceInfo.vendorId.toString(16).uppercase()} / PID 0x${deviceInfo.productId.toString(16).uppercase()}")
+                MiuixInfoRow(stringRes("device_settings_device_serial_num"), deviceInfo.serialNumber.ifEmpty { "SN892170349182" })
                 XiaomiItemDivider()
-                MiuixInfoRow("Variante de couleur", "Type #${deviceInfo.colorType}")
+                MiuixInfoRow(stringRes("device_settings_skin_title"), "Type #${deviceInfo.colorType}")
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -90,11 +90,9 @@ fun MiuixDeviceInfoScreen(
             )
 
             XiaomiCardContainer(modifier = Modifier.padding(horizontal = 12.dp)) {
-                MiuixInfoRow("Version du firmware", deviceInfo.versionName.ifEmpty { "v1.0.4.8" })
+                MiuixInfoRow(stringRes("device_settings_device_firmware_version"), deviceInfo.versionName.ifEmpty { "v1.0.4.8" })
                 XiaomiItemDivider()
-                MiuixInfoRow("Code version", "${deviceInfo.versionCode}")
-                XiaomiItemDivider()
-                MiuixInfoRow("Version protocole RCSP", "v2.1 (Actions/BES)")
+                MiuixInfoRow(stringRes("device_settings_device_fw_version"), "${deviceInfo.versionCode}")
             }
 
             if (onNavigateToGuide != null) {

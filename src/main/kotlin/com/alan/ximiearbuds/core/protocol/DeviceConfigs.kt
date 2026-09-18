@@ -193,6 +193,8 @@ data class TargetDeviceInfo(
     val vendorId: Int = 10007,
     val productId: Int = 0,
     val colorType: Int = 0,
+    val address: String = "",
+    val serialNumber: String = "",
     val leftBattery: BatteryInfo = BatteryInfo(85, false, true),
     val rightBattery: BatteryInfo = BatteryInfo(85, false, true),
     val caseBattery: BatteryInfo = BatteryInfo(90, false, true)
@@ -429,7 +431,8 @@ data class NoiseControlState(
 
         fun fromCommonConfig(config: CommonConfig, currentState: NoiseControlState = NoiseControlState()): NoiseControlState? {
             return when (config.type) {
-                ConfigId.NOISE_LEVEL_CHOOSE, ConfigId.CONFIG_AUDIO_MODE -> {
+                // Config 11 uniquement. Config 1 = audio mode Xiaomi/Dolby, pas ANC (cf. FunctionConfigImpl).
+                ConfigId.NOISE_LEVEL_CHOOSE -> {
                     if (config.value.isNotEmpty()) {
                         val mode = NoiseMode.fromId(config.value[0].toInt() and 0xFF)
                         if (config.value.size >= 2) {
@@ -681,13 +684,13 @@ data class QuickSettings(
 }
 
 // -----------------------------------------------------------------------------------------
-// 6. Find Device / Ring Earbuds
+// 6. Find Device / Ring Earbuds (1:1 FindDeviceConstant & DeviceConfigFindDevice)
 // -----------------------------------------------------------------------------------------
 
 enum class RingTarget(val id: Int) {
-    LEFT(0),
-    RIGHT(1),
-    BOTH(2);
+    LEFT(1),
+    RIGHT(2),
+    BOTH(3);
 
     companion object {
         fun fromId(id: Int): RingTarget = entries.find { it.id == id } ?: BOTH
@@ -695,13 +698,152 @@ enum class RingTarget(val id: Int) {
 }
 
 data class FindDeviceState(
-    val isRinging: Boolean = false,
-    val target: RingTarget = RingTarget.BOTH
+    val isRingingLeft: Boolean = false,
+    val isRingingRight: Boolean = false
 ) {
-    fun toCommonConfig(): CommonConfig {
-        return CommonConfig(
-            type = ConfigId.FIND_DEVICE,
-            value = byteArrayOf(if (isRinging) 1 else 0, target.id.toByte())
-        )
+    val isRinging: Boolean get() = isRingingLeft || isRingingRight
+
+    val target: RingTarget?
+        get() = when {
+            isRingingLeft && isRingingRight -> RingTarget.BOTH
+            isRingingLeft -> RingTarget.LEFT
+            isRingingRight -> RingTarget.RIGHT
+            else -> null
+        }
+
+    companion object {
+        fun createCommand(target: RingTarget, start: Boolean): CommonConfig {
+            return CommonConfig(
+                type = ConfigId.FIND_DEVICE,
+                value = byteArrayOf(if (start) 1 else 0, target.id.toByte())
+            )
+        }
     }
 }
+
+// -----------------------------------------------------------------------------------------
+// 7. Ear Canal Fit Detection (1:1 DeviceConfigFit / Config 5 & 6, DeviceConfigEarCanalFit / Config 60 & 61)
+// -----------------------------------------------------------------------------------------
+
+data class FitDetectionState(
+    val status: Int = STATUS_TIP,
+    val leftResult: Int = FIT_UNKNOWN,
+    val rightResult: Int = FIT_UNKNOWN,
+    val errorCode: Int = CODE_NONE
+) {
+    val isRunning: Boolean
+        get() = status == STATUS_DETECTING
+
+    val isFinished: Boolean
+        get() = status == STATUS_FINISH
+
+    val isSuccess: Boolean
+        get() = leftResult == FIT_WELL && rightResult == FIT_WELL
+
+    companion object {
+        // Official Detection Status (FitDetectionModel.kt)
+        const val STATUS_NOT_START = 0
+        const val STATUS_DETECTING = 1
+        const val STATUS_FINISH = 2
+        const val STATUS_TIP = 3
+
+        // Official Ear Results (FitDetectionModel.kt)
+        const val FIT_UNKNOWN = 0
+        const val FIT_WELL = 1
+        const val FIT_NOT_GOOD = 2
+        const val FIT_NOT_WELL = 2
+        const val FIT_ADJUST_POSITION = 4
+
+        // Official Error / Event Codes (FitDetectionViewModel.kt / FitDetectionFragment.kt)
+        const val CODE_NONE = 0
+        const val CODE_RESPONSE_START = 3
+        const val CODE_EAR_OUT = 9
+        const val CODE_CALLING = 10
+        const val CODE_TIMEOUT = 277
+        const val CODE_DISCONNECT = 1001
+
+        fun createCommands(start: Boolean): List<CommonConfig> {
+            val v = byteArrayOf(if (start) 1 else 0)
+            return listOf(
+                CommonConfig(type = ConfigId.CONFIG_OPEN_COMPACTNESS, value = v),
+                CommonConfig(type = ConfigId.EAR_CANAL_DETECTION, value = v)
+            )
+        }
+
+        fun createCommand(start: Boolean): CommonConfig {
+            return CommonConfig(
+                type = ConfigId.EAR_CANAL_DETECTION,
+                value = byteArrayOf(if (start) 1 else 0)
+            )
+        }
+
+        fun parseFromPayload(data: ByteArray): FitDetectionState {
+            val left = if (data.isNotEmpty()) data[0].toInt() and 0xFF else FIT_UNKNOWN
+            val right = if (data.size > 1) data[1].toInt() and 0xFF else FIT_UNKNOWN
+            val finished = (left in 1..2 || left == FIT_ADJUST_POSITION) && (right in 1..2 || right == FIT_ADJUST_POSITION)
+            return FitDetectionState(
+                status = if (finished) STATUS_FINISH else STATUS_DETECTING,
+                leftResult = left,
+                rightResult = right
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------------------
+// 8. Earbox Sound (1:1 DeviceConfigEarBoxSound & DeviceConfigEarBoxSoundSetting / Config 115 & 116)
+// -----------------------------------------------------------------------------------------
+
+data class EarboxSoundHeaderState(
+    val soundId: Int = 0,
+    val volume: Int = 75,
+    val totalVolume: Int = 100
+)
+
+data class EarboxSoundState(
+    val openSound: EarboxSoundHeaderState = EarboxSoundHeaderState(soundId = 0, volume = 75),
+    val closeSound: EarboxSoundHeaderState = EarboxSoundHeaderState(soundId = 0, volume = 75),
+    val chargeSound: EarboxSoundHeaderState = EarboxSoundHeaderState(soundId = 0, volume = 75)
+) {
+    companion object {
+        const val SOUND_TYPE_OPEN = 0
+        const val SOUND_TYPE_CLOSE = 1
+        const val SOUND_TYPE_CHARGE = 2
+
+        const val SETTING_TYPE_SOUND = 0
+        const val SETTING_TYPE_VOLUME = 1
+
+        fun parseFromPayload(data: ByteArray): EarboxSoundState {
+            var open = EarboxSoundHeaderState()
+            var close = EarboxSoundHeaderState()
+            var charge = EarboxSoundHeaderState()
+
+            val buffer = java.nio.ByteBuffer.wrap(data)
+            while (buffer.remaining() >= 4) {
+                try {
+                    val soundType = buffer.get().toInt() and 0xFF
+                    val soundId = buffer.get().toInt() and 0xFF
+                    val volume = buffer.get().toInt() and 0xFF
+                    val totalVolume = buffer.get().toInt() and 0xFF
+                    val header = EarboxSoundHeaderState(soundId, volume, totalVolume)
+                    when (soundType) {
+                        SOUND_TYPE_OPEN -> open = header
+                        SOUND_TYPE_CLOSE -> close = header
+                        SOUND_TYPE_CHARGE -> charge = header
+                    }
+                } catch (e: Exception) {
+                    break
+                }
+            }
+            return EarboxSoundState(open, close, charge)
+        }
+
+        fun createSetCommand(settingType: Int, soundType: Int, value: Int): CommonConfig {
+            return CommonConfig(
+                type = ConfigId.EARBOX_SOUND_SET,
+                value = byteArrayOf(settingType.toByte(), soundType.toByte(), value.coerceIn(0, 100).toByte())
+            )
+        }
+    }
+}
+

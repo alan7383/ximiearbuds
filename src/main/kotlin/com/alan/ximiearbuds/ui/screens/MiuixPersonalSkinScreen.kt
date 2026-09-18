@@ -44,13 +44,13 @@ fun MiuixPersonalSkinScreen(
 
     // Color definitions mapping color IDs to visual tints and names
     val availableColors = listOf(
-        1 to ("Blanc Pur" to Color(0xFFF0F0F2)),
-        2 to ("Noir Graphite" to Color(0xFF222226)),
-        3 to ("Argent Givré" to Color(0xFFB0B3B8)),
-        4 to ("Bleu Céleste" to Color(0xFF4A90E2)),
-        7 to ("Édition Spéciale" to Color(0xFFE5A93C)),
-        9 to ("Titane Naturel" to Color(0xFF8E8E93)),
-        10 to ("Vert Aurore" to Color(0xFF2E7D32))
+        1 to (stringRes("device_settings_skin_white") to Color(0xFFF0F0F2)),
+        2 to (stringRes("device_settings_skin_black") to Color(0xFF222226)),
+        3 to (stringRes("device_settings_skin_silver") to Color(0xFFB0B3B8)),
+        4 to (stringRes("device_settings_skin_blue") to Color(0xFF4A90E2)),
+        7 to (stringRes("device_settings_skin_gold") to Color(0xFFE5A93C)),
+        9 to (stringRes("device_settings_skin_titanium") to Color(0xFF8E8E93)),
+        10 to (stringRes("device_settings_skin_green") to Color(0xFF2E7D32))
     )
 
     Column(

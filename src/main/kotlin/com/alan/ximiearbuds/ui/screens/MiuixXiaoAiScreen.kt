@@ -184,9 +184,8 @@ fun MiuixXiaoAiScreen(
 
             XiaomiCardContainer {
                 val timbres = listOf(
-                    1 to ("Voix classique" to "Tonalité standard claire et naturelle"),
-                    2 to ("Voix douce" to "Intonation chaleureuse et posée"),
-                    3 to ("Voix dynamique" to "Rythme énergique et réactif")
+                    1 to (stringRes("super_aivs_tune_honey") to stringRes("device_settings_super_aivs_voice_tone_subtitle")),
+                    2 to (stringRes("super_aivs_tune_galaxy") to stringRes("device_settings_super_aivs_voice_tone_subtitle"))
                 )
 
                 timbres.forEachIndexed { index, (timbreId, info) ->

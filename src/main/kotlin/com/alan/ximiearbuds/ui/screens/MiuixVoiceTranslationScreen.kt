@@ -20,6 +20,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import com.alan.ximiearbuds.core.device.EarbudsController
 import com.alan.ximiearbuds.ui.components.MiuixTopAppBar
 import com.alan.ximiearbuds.ui.components.XiaomiCardContainer
@@ -37,8 +40,6 @@ fun MiuixVoiceTranslationScreen(
     modifier: Modifier = Modifier
 ) {
     var isRecording by remember { mutableStateOf(false) }
-    var sourceLang by remember { mutableStateOf("Français") }
-    var targetLang by remember { mutableStateOf("English") }
     val scrollState = rememberScrollState()
 
     val pulseTransition = rememberInfiniteTransition(label = "recPulse")
@@ -137,7 +138,7 @@ fun MiuixVoiceTranslationScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = sourceLang,
+                        text = stringRes("device_settings_input_lang"),
                         color = XiaomiCyan,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
@@ -149,7 +150,7 @@ fun MiuixVoiceTranslationScreen(
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = targetLang,
+                        text = stringRes("device_settings_translation_lang"),
                         color = XiaomiCyan,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
@@ -167,38 +168,31 @@ fun MiuixVoiceTranslationScreen(
             )
 
             XiaomiCardContainer {
-                val samples = listOf(
-                    "Réunion projet XimiEarbuds" to ("15 sept. 2026 • 04:12" to "1.2 Mo"),
-                    "Note vocale Protocole Bluetooth" to ("14 sept. 2026 • 01:45" to "480 Ko")
-                )
-
-                samples.forEachIndexed { index, (title, meta) ->
-                    val (date, size) = meta
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = title,
-                                color = XiaomiTextPrimary,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "$date • $size",
-                                color = XiaomiTextSecondary,
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
-                    if (index < samples.size - 1) {
-                        XiaomiItemDivider()
-                    }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp, horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Image(
+                        painter = painterResource("drawable/device_settings_list_empty.webp"),
+                        contentDescription = null,
+                        modifier = Modifier.size(100.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = stringRes("device_settings_no_record_file"),
+                        color = XiaomiTextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = stringRes("device_settings_record_file_download_notify"),
+                        color = XiaomiTextSecondary,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
