@@ -145,51 +145,82 @@ fun XiaomiAddDeviceView(
                 modifier = Modifier.padding(start = 6.dp, top = 4.dp, bottom = 12.dp)
             )
 
-            // B. Scanning Radar Item (device_item_bluetooth_connect.xml)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(XiaomiCardBg)
-                    .border(width = 1.dp, color = XiaomiCardBorder, shape = RoundedCornerShape(20.dp))
-                    .padding(vertical = 24.dp, horizontal = 16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    OfficialRadarScanner(isScanning = isScanning)
+            // B. Scanning Radar Item (when no devices found) OR Scanned Devices Grid (device_item_small_device_card.xml)
+            if (allVisibleDevices.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(XiaomiCardBg)
+                        .border(width = 1.dp, color = XiaomiCardBorder, shape = RoundedCornerShape(20.dp))
+                        .padding(vertical = 24.dp, horizontal = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        OfficialRadarScanner(isScanning = isScanning)
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = stringRes("device_bluetooth_connect_hint"),
-                        fontSize = 12.5.sp,
-                        color = XiaomiTextMuted,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 18.sp,
-                        modifier = Modifier.padding(horizontal = 12.dp)
-                    )
+                        Text(
+                            text = stringRes("device_bluetooth_connect_hint"),
+                            fontSize = 12.5.sp,
+                            color = XiaomiTextMuted,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 18.sp,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
+                    }
                 }
-            }
+            } else {
+                // Official AddDeviceViewModel: discovered devices are inserted into the 2-column grid
+                val scannedChunks = remember(allVisibleDevices) {
+                    allVisibleDevices.chunked(2)
+                }
 
-            // C. Discovered Nearby Devices (device_item_device_list.xml)
-            if (allVisibleDevices.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(20.dp))
+                scannedChunks.forEachIndexed { chunkIndex, rowDevices ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowDevices.forEachIndexed { itemIndex, device ->
+                            val model = remember(device.name) {
+                                if (device.isXiaomiEarbuds) DeviceRegistry.findByName(device.name) else null
+                            }
+                            val effectiveModel = if (model != null && model.codename != "GENERIC") model else null
 
-                allVisibleDevices.forEach { device ->
-                    DiscoveredDeviceItemCard(
-                        device = device,
-                        onConnectClicked = {
-                            controller.connectToDevice(device)
-                            onDeviceSelected?.invoke(device)
+                            val isFirst = (chunkIndex == 0 && itemIndex == 0)
+                            val tagText = when {
+                                device.isConnected -> stringRes("device_manager_paired")
+                                isFirst -> stringRes("device_manager_distance_closest")
+                                else -> null
+                            }
+
+                            SmallDeviceCard(
+                                name = device.name.ifBlank { effectiveModel?.commercialName ?: "Xiaomi Earbuds" },
+                                edition = effectiveModel?.brand?.ifBlank { "Xiaomi" } ?: "Xiaomi",
+                                tag = tagText,
+                                model = effectiveModel,
+                                colorType = device.colorType,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    controller.connectToDevice(device)
+                                    onDeviceSelected?.invoke(device)
+                                }
+                            )
                         }
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
+
+                        if (rowDevices.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // D. Section Divider with Title: "Ajouter des écouteurs manuellement" (device_add_self)
+            // C. Section Divider with Title: "Ajouter des écouteurs manuellement" (device_add_self)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -212,7 +243,7 @@ fun XiaomiAddDeviceView(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // E. 2-Column Grid: Official device_item_small_device_card.xml
+            // D. 2-Column Grid: Official device_item_small_device_card.xml
             val chunkedModels = remember(catalogModels) {
                 catalogModels.chunked(2)
             }
@@ -226,6 +257,9 @@ fun XiaomiAddDeviceView(
                 ) {
                     // Card 1
                     SmallDeviceCard(
+                        name = rowModels[0].commercialName,
+                        edition = rowModels[0].brand.ifBlank { "Xiaomi" },
+                        tag = null,
                         model = rowModels[0],
                         modifier = Modifier.weight(1f),
                         onClick = { onModelSelected(rowModels[0]) }
@@ -234,6 +268,9 @@ fun XiaomiAddDeviceView(
                     // Card 2 or empty placeholder for balance
                     if (rowModels.size > 1) {
                         SmallDeviceCard(
+                            name = rowModels[1].commercialName,
+                            edition = rowModels[1].brand.ifBlank { "Xiaomi" },
+                            tag = null,
                             model = rowModels[1],
                             modifier = Modifier.weight(1f),
                             onClick = { onModelSelected(rowModels[1]) }
@@ -250,13 +287,18 @@ fun XiaomiAddDeviceView(
 }
 
 /**
- * 1:1 Reproduction of device_item_small_device_card.xml
+ * 1:1 Strict Reproduction of device_item_small_device_card.xml
  * ConstraintLayout with height 167dp, device_scan_item_bg (20dp corner radius),
+ * device_tag_tv (13.33sp, colorPrimary with 10% opacity pill background, top-right 8dp margins),
  * device_icon_iv (96dp x 96dp), device_name_tv (16sp medium), and device_edition_tv (12sp regular 40%).
  */
 @Composable
 private fun SmallDeviceCard(
-    model: EarbudsModel,
+    name: String,
+    edition: String,
+    tag: String? = null,
+    model: EarbudsModel? = null,
+    colorType: Int? = null,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -267,142 +309,82 @@ private fun SmallDeviceCard(
             .background(XiaomiCardBg)
             .border(width = 1.dp, color = XiaomiCardBorder, shape = RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Authentic 96dp x 96dp Device Render (device_icon_iv)
+        // Tag TV (device_tag_tv) at TopEnd: 8dp top, 8dp end
+        if (!tag.isNullOrBlank()) {
             Box(
                 modifier = Modifier
-                    .size(96.dp)
-                    .padding(bottom = 6.dp),
-                contentAlignment = Alignment.Center
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 8.dp)
+                    .clip(RoundedCornerShape(133.dp))
+                    .background(XiaomiCyan.copy(alpha = 0.10f))
+                    .padding(horizontal = 10.dp, vertical = 3.3.dp)
             ) {
-                XiaomiDeviceImage(
-                    model = model,
-                    contentDescription = model.commercialName,
-                    modifier = Modifier.fillMaxSize()
+                Text(
+                    text = tag,
+                    color = XiaomiCyan,
+                    fontSize = 13.33.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
                 )
             }
+        }
 
-            // Model Name (device_name_tv, FontMedium.16sp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 13.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // device_icon_iv: 96dp x 96dp, layout_marginTop = 26dp
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Box(
+                modifier = Modifier.size(96.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (model != null && model.codename != "GENERIC") {
+                    XiaomiDeviceImage(
+                        model = model,
+                        colorType = colorType,
+                        contentDescription = name,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Image(
+                        painter = androidx.compose.ui.res.painterResource("drawable/device_list_icon_default.webp"),
+                        contentDescription = name,
+                        modifier = Modifier.size(80.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // device_name_tv: FontMedium.16sp, text_color
             Text(
-                text = model.commercialName,
-                fontSize = 14.5.sp,
+                text = name,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
                 color = XiaomiTextPrimary,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 4.dp)
+                modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
-            // Edition / Brand Subtitle (device_edition_tv, FontRegular.12sp, 40% opacity)
+            // device_edition_tv: FontRegular.12sp, text_color_40
             Text(
-                text = model.brand.ifBlank { "Xiaomi" },
+                text = edition,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Normal,
                 color = XiaomiTextMuted,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-/**
- * 1:1 Reproduction of device_item_device_list.xml for discovered nearby devices.
- */
-@Composable
-private fun DiscoveredDeviceItemCard(
-    device: DiscoveredDevice,
-    onConnectClicked: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(78.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(XiaomiCardBg)
-            .border(1.dp, XiaomiCardBorder, RoundedCornerShape(18.dp))
-            .clickable(onClick = onConnectClicked)
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val model = remember(device.name) {
-            if (device.isXiaomiEarbuds) com.alan.ximiearbuds.core.device.DeviceRegistry.findByName(device.name) else null
-        }
-        val effectiveModel = if (model != null && model.codename != "GENERIC") model else null
-
-        // Bluetooth / Device Icon Box
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFF142436)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (effectiveModel != null) {
-                XiaomiDeviceImage(
-                    model = effectiveModel,
-                    colorType = device.colorType,
-                    modifier = Modifier.size(40.dp)
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Bluetooth,
-                    contentDescription = null,
-                    tint = XiaomiCyan,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(14.dp))
-
-        // Device Name & Address
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = device.name.ifBlank { "Xiaomi Earbuds" },
-                color = XiaomiTextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = device.address,
-                color = XiaomiTextMuted,
-                fontSize = 12.sp
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        // "Connecter" Action Button (switch_device_btn)
-        Button(
-            onClick = onConnectClicked,
-            shape = RoundedCornerShape(20.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = XiaomiCyan,
-                contentColor = Color.Black
-            ),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-            modifier = Modifier.height(36.dp)
-        ) {
-            Text(
-                text = stringRes("device_manager_switch"),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
